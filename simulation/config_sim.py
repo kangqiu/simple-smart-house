@@ -2,6 +2,12 @@
 config_sim.py
 
 configuration file for
+
+- add t_out 
+- add realistic spot price 
+- monthly timewindows -> pick months that are fluctuating
+- noise (room temperature and heat pump -> rw for whole simulation (before))
+- 
 """
 
 
@@ -20,12 +26,12 @@ import datahandling
 # data
 local_timezone = pytz.timezone('Europe/Oslo')
 n_mpc = 288 #24 hour prediction window
-start = dt.datetime(2022, 11, 10, 0, 0).astimezone(local_timezone)
-stop = dt.datetime(2022, 11, 17, 0, 0).astimezone(local_timezone)
+start = dt.datetime(2022, 1, 1, 0, 0).astimezone(local_timezone)
+stop = dt.datetime(2022, 2, 1, 0, 0).astimezone(local_timezone)
 # outside temperature data
-temp_file = '../data/SEKLIMAData_2022.pkl'
+temp_file = './data/SEKLIMAData_2022.pkl'
 # spot data
-spot_file = '../data/SpotData2022_Trheim.pkl'
+spot_file = './data/SpotData2022_Trheim.pkl'
 
 #set outside temperature and spot price constant for now
 t_out_data = [5] * 288 * (7+1)
@@ -66,10 +72,10 @@ t_room = MX.sym('t_room') #
 t_out = MX.sym('t_out')
 hp = MX.sym('hp')
 
-# COP is calculated with 0.2* the inverse carnot efficiency (theoretical efficiency of heat pumps)
-# (desired temperature at home cold temp outside)
-t_avg = -7  #in ˚C
-COP = 0.2*((t_desired+273.15)/(t_desired - t_avg)) # roughly translates to a COP of 2.1
+# COP is calculated with 0.3* the inverse carnot efficiency (theoretical maximum efficiency of heat pumps)
+# carnot efficiency calculated as lowest recorded temperature in Trondheim
+t_avg = -18 #in ˚C
+COP = 0.3*((t_desired+273.15)/(t_desired - t_avg)) # roughly translates to a COP of 2.26
 
 # Wall Temperature
 t_wall_plus = m_wall * t_wall + rho_out * (t_out - t_wall) + rho_in * (t_room - t_wall)

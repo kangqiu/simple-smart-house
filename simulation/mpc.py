@@ -125,14 +125,14 @@ def set_initial_conditions(state0, lbw, ubw):
     ubw['state', 0, 'hp'] = state0['hp']
     return lbw, ubw
 
-def get_step(w, lbg, ubg, data, state0, solverMPC, time):
+def get_step(w, lbg, ubg, data, state0, solverMPC, spot, out_temp):
     # self.TimeInitial = TimeSchedule
 
     # get numerical data
     #forecasts = datahandling.get_mpc_data(time)
     datanum = data(0)
-    datanum['t_out', :] = cfg.t_out_data[0:288]
-    datanum['spot', :] = cfg.spot_price_data[0:288]
+    datanum['t_out', :] = spot
+    datanum['spot', :] = out_temp
 
     # define upper lower bound on decision variables
     ubw = w(+inf)

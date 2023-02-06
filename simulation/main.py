@@ -33,14 +33,21 @@ def get_simulation_step(history, t_out, hp):
 def main():
     # initialize history
     timesteps, timesteps_N, dt, dt_N = datahandling.get_time()
+
+    # get outdoor temperature of the month
+    # get spot pricing of the month
+    spot = datahandling.get_spot_data(timesteps_N[0], timesteps_N[-1], dt_N)
+    out_temp = datahandling.get_outside_temperature(timesteps_N[0], timesteps_N[-1], dt_N)
+
     history = cfg.history
 
     w, data, solverMPC, lbg, ubg = mpc.instantiate()
 
     for ts in range(len(timesteps)):
-
-        hp = mpc.get_step(w, lbg, ubg, data, history[-1], solverMPC, ts)
-        t_wall, t_room = get_simulation_step(history[-1], cfg.t_out_data[0], hp)
+        spot_forecast = spot[ts:ts+cfg.n_mpc]
+        out_temp_forecast = out_temp[ts:ts+cfg.n_mpc]
+        hp = mpc.get_step(w, lbg, ubg, data, history[-1], solverMPC, spot_forecast, out_temp_forecast)
+        t_wall, t_room = get_simulation_step(history[-1], out_temp[ts], hp)
 
         #append to history
         history.append({})
