@@ -60,13 +60,13 @@ def get_objective(w, data):
     hubber = 0.5
     for k in range(cfg.n_mpc - 1):
             J += (cfg.w_tabove * (cfg.t_desired - w['state', k, 'room'])**2 / float(cfg.n_mpc))
-            J += (cfg.w_tbelow * w['state', k, 'slack'] ** 2 / float(cfg.n_mpc))
-            J += (cfg.w_tmin * w['state', k, 'slackmin'] ** 2 / float(cfg.n_mpc))
-            J += (cfg.w_target * (hubber ** 2) * (sqrt(1+(w['input', k, 'dt_target']/hubber) ** 2) - 1)/ float(cfg.n_mpc))
-            J += (cfg.w_spot * (data['spot', k] * w['state', k, 'power']) / float(cfg.n_mpc))
+            # J += (cfg.w_tbelow * w['state', k, 'slack'] ** 2 / float(cfg.n_mpc))
+            # J += (cfg.w_tmin * w['state', k, 'slackmin'] ** 2 / float(cfg.n_mpc))
+            # J += (cfg.w_target * (hubber ** 2) * (sqrt(1+(w['input', k, 'dt_target']/hubber) ** 2) - 1)/ float(cfg.n_mpc))
+            # J += (cfg.w_spot * (data['spot', k] * w['state', k, 'power']) / float(cfg.n_mpc))
     # terminal cost
-    J += (cfg.w_tbelow * w['state', -1, 'slack'] ** 2 / float(cfg.n_mpc))
-    J += (cfg.w_tmin * w['state', -1, 'slackmin'] ** 2 / float(cfg.n_mpc))
+    # J += (cfg.w_tbelow * w['state', -1, 'slack'] ** 2 / float(cfg.n_mpc))
+    # J += (cfg.w_tmin * w['state', -1, 'slackmin'] ** 2 / float(cfg.n_mpc))
 
     return J
 

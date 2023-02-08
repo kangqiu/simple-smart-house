@@ -1,10 +1,10 @@
 """
 config_sim.py
 
-configuration file for
+configuration file for simple house simulator
 
-- noise (room temperature and heat pump -> rw for whole simulation (before))
-- 
+- get noise trajectories
+- implement some rudimentary plotting
 """
 
 
@@ -39,21 +39,21 @@ spot_price_data = [22] * 288 * (7+1)
 
 ################################################################################################
 # parameters
-m_air = 31.02679204362912
-m_wall = 67.21826736655125 
-rho_in = 0.36409940390361406
-rho_out = 0.03348756113438382
-rho_dir = 0.03348756179891388
+m_air = 31.02679204362912 + 1
+m_wall = 67.21826736655125 + 1
+rho_in = 0.36409940390361406 - 0.1
+rho_out = 0.03348756113438382 - 0.015
+rho_dir = 0.03348756179891388 - 0.01
 fan = 0.2430419894184425
 
 t_desired = 21
 t_min = 17
 
-hpset = 0.06071641164806341
-hpin = 0.08436238305547132 
-hp0 = 1.1441609877948857
+hpset = 0.06071641164806341 + 0.04
+hpin = 0.08436238305547132  - 0.02
+hp0 = 1.1441609877948857 
 ReLu = 100
-maxpow =  2.0
+maxpow =  3
 
 ################################################################################################
 # simulation config
@@ -88,7 +88,7 @@ power = Function(
 # define prediction model
 
 # I had to set the COP very very high, dunno how to fix that without having to fit a heat pump model
-COP = 9.0 
+COP = 3.0 
 t_wall_plus = m_wall * t_wall + rho_out * (t_out - t_wall) + rho_in * (t_room - t_wall)
 t_wall_plus *= 1 / m_wall
 wallplus = Function(
