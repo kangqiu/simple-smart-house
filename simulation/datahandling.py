@@ -15,6 +15,7 @@ import scipy.interpolate as scinterp
 import pandas as pd
 import numpy as np
 import pickle as pkl
+import matplotlib.pyplot as plt
 
 ################################################################################################
 # file imports
@@ -128,3 +129,78 @@ def get_outside_temperature(start, stop, dt_N):
         )
 
     return outtemp
+
+
+def generate_noise_trajectories(timesteps):
+
+    """ generates noise trajectory """
+    if cfg.add_noise:
+        # check if the noise file exists
+        if os.path.isfile(cfg.noise_file): # load noise file and check if the trajectories match
+            with open(cfg.noise_file, 'rb') as handle:
+                noise = pkl.load(handle)
+            if len(noise['room']) < len(timesteps):
+                raise Exception("Room temperature noise trajectory too short!")
+            if len(noise['power']) <len(timesteps):
+                raise Exception("Power  noise trajectory too short!")
+
+        else: # generates new noise file
+            power_noise = [0]
+            room_noise = [0]
+            for ts in range(len(timesteps)):
+                power_noise.append(cfg.noise['beta']['power'] * power_noise[-1] + np.random.normal(cfg.noise['mu']['power'], cfg.noise['epsilon']['power'] * cfg.noise['sig']['power']))
+                room_noise.append(cfg.noise['beta']['room'] * room_noise[-1] + np.random.normal(cfg.noise['mu']['room'], cfg.noise['epsilon']['room'] * cfg.noise['sig']['room']))
+            #save noise in file 
+            noise = {'power': power_noise[1::], 'room': room_noise[1::]}
+            with open(cfg.noise_file, 'wb') as handle:
+                pkl.dump(noise, handle, protocol=-1)
+
+    else: #set noise to 0
+        power_noise = [0]
+        room_noise = [0]
+        for ts in range(len(timesteps)):
+            power_noise.append(0)
+            room_noise.append(0)
+
+        noise = {'power': power_noise[1::], 'room': room_noise[1::]}
+    
+    return noise
+
+def plot(df_history, start, stop, spot):
+    timesteps  = list(df_history.index.values[start:stop])
+    fig, (ax1, ax2) = plt.subplots(2)
+    ax1.plot(timesteps, [21] * len(timesteps), label='t_desired')
+    ax1.plot(timesteps, df_history['room'].values.tolist()[start:stop], label='t_room')
+    ax1.plot(timesteps, df_history['target'].values.tolist()[start:stop], label="t_set")
+    ax1.set_xticklabels([])
+    ax1.tick_params( axis="x", 
+                labelrotation=45,  # changes apply to the x-axis
+                which="both",  # both major and minor ticks are affected
+                bottom=False,  # ticks along the bottom edge are off
+                top=False,
+            )
+    ax1.grid()
+    handles, labels = ax1.get_legend_handles_labels()
+
+    ax2.set_xlabel('time')
+    ax2.set_ylabel('power consumption [kW]', color='green')
+    ax2.plot(
+        timesteps, df_history['power'].values.tolist()[start:stop], label="Power", color='green')
+    ax2.tick_params(axis="x", labelrotation=45)
+    ax3 = ax2.twinx()
+    ax3.set_ylabel("spot pricing", color='orange')
+    ax3.plot(
+        timesteps, spot[start:stop],
+        label="Spot",
+        color='orange'
+    )
+    ax3.grid()
+
+    fig.legend(handles, labels, loc='upper center')
+    plt.tight_layout()
+    plt.grid("on")
+    plt.show()
+    plt.close(fig)
+    pass
+
+

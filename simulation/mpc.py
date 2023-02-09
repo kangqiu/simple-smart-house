@@ -17,8 +17,9 @@ def get_model(w, data):
     ubg = []
     for k in range(cfg.n_mpc - 1):
         power = cfg.power( w['state', k, 'room'], w['state', k, 't_target'])
+        satpower = cfg.satpower(power)
         # Power Temperature Dynamics
-        g.append(power - w['state', k, 'power'])
+        g.append(satpower - w['state', k, 'power'])
         lbg.append(0)
         ubg.append(0)
 
@@ -58,15 +59,23 @@ def get_objective(w, data):
     ### Cost ###
     J = 0
     hubber = 0.5
+    # weights
+    w_spot = 0.1  # weight spot cost
+    w_tbelow = 0.2  # weight temperature below
+    w_tabove = 0.005  # weight temperature above
+    w_tmin = 50
+    w_target = 0.5
+
     for k in range(cfg.n_mpc - 1):
-            J += (cfg.w_tabove * (cfg.t_desired - w['state', k, 'room'])**2 / float(cfg.n_mpc))
-            # J += (cfg.w_tbelow * w['state', k, 'slack'] ** 2 / float(cfg.n_mpc))
-            # J += (cfg.w_tmin * w['state', k, 'slackmin'] ** 2 / float(cfg.n_mpc))
-            # J += (cfg.w_target * (hubber ** 2) * (sqrt(1+(w['input', k, 'dt_target']/hubber) ** 2) - 1)/ float(cfg.n_mpc))
-            # J += (cfg.w_spot * (data['spot', k] * w['state', k, 'power']) / float(cfg.n_mpc))
+            J += (w_tabove * (cfg.t_desired - w['state', k, 'room'])**2 / float(cfg.n_mpc))
+            #J += (w_tbelow * w['state', k, 'slack'] ** 2 / float(cfg.n_mpc))
+            # J += (w_tmin * w['state', k, 'slackmin'] ** 2 / float(cfg.n_mpc))
+            # J += (w_target * (hubber ** 2) * (sqrt(1+(w['input', k, 'dt_target']/hubber) ** 2) - 1)/ float(cfg.n_mpc))
+            # J += (w_target * w['input', k, 'dt_target'] ** 2 / float(cfg.n_mpc))
+            # J += (w_spot * (data['spot', k] * w['state', k, 'power']) / float(cfg.n_mpc))
     # terminal cost
-    # J += (cfg.w_tbelow * w['state', -1, 'slack'] ** 2 / float(cfg.n_mpc))
-    # J += (cfg.w_tmin * w['state', -1, 'slackmin'] ** 2 / float(cfg.n_mpc))
+    # J += (w_tbelow * w['state', -1, 'slack'] ** 2 / float(cfg.n_mpc))
+    # J += (w_tmin * w['state', -1, 'slackmin'] ** 2 / float(cfg.n_mpc))
 
     return J
 
@@ -160,5 +169,7 @@ def get_step(w, lbg, ubg, data, state0, solverMPC, spot, out_temp):
     w_opt = w(w_opt)
 
     mpcaction = w_opt['state', 1, 't_target'].full().flatten()[0]
+    ## open loop plotting?
+
 
     return mpcaction
