@@ -28,21 +28,14 @@ start = dt.datetime(2022, 1, 1, 0, 0).astimezone(local_timezone)
 stop = dt.datetime(2022, 1, 10, 0, 0).astimezone(local_timezone)
 # outside temperature data
 temp_file = './data/SEKLIMAData_2022.pkl'
-# spot data
 spot_file = './data/SpotData2022_Trheim.pkl'
-# noise file
-noise_file = "./data/noise.pkl"
+noise_file = './data/noise.pkl'
 
-#set outside temperature and spot price constant for now
-t_out_data = [5] * 288 * (7+1)
-spot_price_data = [22] * 288 * (7+1)
-
+# results are saved in this file
+results_file = './results/test_tracking_slack_target.pkl'
 
 
 ################################################################################################
-# references
-t_desired = 21
-t_min = 17
 
 ################################################################################################
 # simulation config
@@ -53,7 +46,9 @@ history = [{
     'wall': 18.3,
     'target': 18,
     'room_noise': 0,
-    'power_noise': 0
+    'power_noise': 0,
+    't_min': 17,
+    't_desired': 18
 }]
 
 ################################################################################################
@@ -126,6 +121,6 @@ solver_options = {
 noise = {   'mu' : { 'room': 0, 'power': 0.033},
             'sig': { 'room': 0.005317236877233841, 'power': 0.2963125110789097},
             'beta': { 'room': 0.99, 'power': 0.92},
-            'epsilon': { 'room': 0.73, 'power':  0.68},
+            'epsilon': { 'room': 0.70, 'power':  0.68},
 }
 

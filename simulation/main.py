@@ -7,6 +7,7 @@ main file for simple smart house mpc example
 # package imports
 from casadi.tools import *
 import pandas as pd
+import pickle as pkl
 
 ################################################################################################
 # file imports
@@ -50,9 +51,13 @@ def main():
     # get spot pricing of the month
     spot = datahandling.get_spot_data(timesteps_N[0], timesteps_N[-1], dt_N)
     out_temp = datahandling.get_outside_temperature(timesteps_N[0], timesteps_N[-1], dt_N)
+    # get minimum and desired temperature references
+    t_min, t_desired = datahandling.get_temperature_settings(dt_N, cfg.start)
+
 
     history = cfg.history
-    df_history = pd.DataFrame(columns=['room', 'wall', 'power', 'target', 'room_noise', 'power_noise'])
+    df_history = pd.DataFrame(columns=['room', 'wall', 'power', 'target', 'room_noise', 'power_noise', 't_min',
+                                       't_desired', 'spot_price', 't_out'])
 
     noise  = datahandling.generate_noise_trajectories(timesteps)
 
@@ -61,8 +66,10 @@ def main():
     for ts in range(len(timesteps)):
         spot_forecast = spot[ts:ts+cfg.n_mpc]
         out_temp_forecast = out_temp[ts:ts+cfg.n_mpc]
-        t_target = mpc.get_step(w, lbg, ubg, data, history[-1], solverMPC, spot_forecast, out_temp_forecast)
-        # t_target = 31
+        t_min_reference = t_min[ts:ts+cfg.n_mpc]
+        t_desired_reference = t_desired[ts:ts + cfg.n_mpc]
+        t_target = mpc.get_step(w, lbg, ubg, data, history[-1], solverMPC, spot_forecast, out_temp_forecast, t_min_reference, t_desired_reference)
+        # t_target = 25
         t_wall, t_room, power = get_simulation_step(history[-1], out_temp[ts], t_target, noise['room'][ts], noise['power'][ts])
 
         #append to history
@@ -73,12 +80,21 @@ def main():
         history[-1]['target'] = t_target
         history[-1]['room_noise'] = noise['room'][ts]
         history[-1]['power_noise'] = noise['power'][ts]
+        history[-1]['t_min'] = t_min[ts]
+        history[-1]['t_desired'] = t_desired[ts]
+        history[-1]['spot_price'] = spot[ts]
+        history[-1]['t_out'] = out_temp[ts]
 
         df_history = pd.concat([df_history, pd.DataFrame(history[-1], index=[0])], ignore_index=True)
     
     # some rudimentary plotting features
     datahandling.plot(df_history, 0, len(timesteps), spot)
-    return history
+    print("Save results")
+    f = open(cfg.results_file, "wb")
+    pkl.dump(df_history, f, protocol=2)
+    f.close()
+
+
 
 
 ########################################################################################################################

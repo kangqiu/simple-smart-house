@@ -45,11 +45,11 @@ def get_model(w, data):
 
 
         ### Slack stuff ###
-        g.append(cfg.t_desired - w['state', k, 'room'] - w['state', k, 'slack'])
+        g.append(data['t_desired', k] - w['state', k, 'room'] - w['state', k, 'slack'])
         lbg.append(-inf)
         ubg.append(0)
 
-        g.append(cfg.t_min - w['state', k, 'room'] - w['state', k, 'slackmin'])
+        g.append(data['t_min', k] - w['state', k, 'room'] - w['state', k, 'slackmin'])
         lbg.append(-inf)
         ubg.append(0)
 
@@ -67,22 +67,24 @@ def get_objective(w, data):
     w_target = 0.5
 
     for k in range(cfg.n_mpc - 1):
-            J += (w_tabove * (cfg.t_desired - w['state', k, 'room'])**2 / float(cfg.n_mpc))
-            #J += (w_tbelow * w['state', k, 'slack'] ** 2 / float(cfg.n_mpc))
-            # J += (w_tmin * w['state', k, 'slackmin'] ** 2 / float(cfg.n_mpc))
-            # J += (w_target * (hubber ** 2) * (sqrt(1+(w['input', k, 'dt_target']/hubber) ** 2) - 1)/ float(cfg.n_mpc))
+            J += (w_tabove * (data['t_desired', k] - w['state', k, 'room'])**2 / float(cfg.n_mpc))
+            J += (w_tbelow * w['state', k, 'slack'] ** 2 / float(cfg.n_mpc))
+            J += (w_tmin * w['state', k, 'slackmin'] ** 2 / float(cfg.n_mpc))
+            J += (w_target * (hubber ** 2) * (sqrt(1+(w['input', k, 'dt_target']/hubber) ** 2) - 1)/ float(cfg.n_mpc))
             # J += (w_target * w['input', k, 'dt_target'] ** 2 / float(cfg.n_mpc))
             # J += (w_spot * (data['spot', k] * w['state', k, 'power']) / float(cfg.n_mpc))
     # terminal cost
-    # J += (w_tbelow * w['state', -1, 'slack'] ** 2 / float(cfg.n_mpc))
-    # J += (w_tmin * w['state', -1, 'slackmin'] ** 2 / float(cfg.n_mpc))
+    J += (w_tbelow * w['state', -1, 'slack'] ** 2 / float(cfg.n_mpc))
+    J += (w_tmin * w['state', -1, 'slackmin'] ** 2 / float(cfg.n_mpc))
 
     return J
 
 def instantiate():
     # get variable MPC Data structure
     data = [entry('t_out', repeat=cfg.n_mpc),
-            entry('spot', repeat=cfg.n_mpc)]
+            entry('spot', repeat=cfg.n_mpc),
+            entry('t_min', repeat=cfg.n_mpc),
+            entry('t_desired', repeat=cfg.n_mpc)]
     data = struct_symMX(data)
 
     #get w
@@ -140,7 +142,7 @@ def set_initial_conditions(state0, lbw, ubw):
     ubw['state', 0, 't_target'] = state0['target']
     return lbw, ubw
 
-def get_step(w, lbg, ubg, data, state0, solverMPC, spot, out_temp):
+def get_step(w, lbg, ubg, data, state0, solverMPC, spot, out_temp, t_min, t_desired):
     # self.TimeInitial = TimeSchedule
 
     # get numerical data
@@ -148,6 +150,8 @@ def get_step(w, lbg, ubg, data, state0, solverMPC, spot, out_temp):
     datanum = data(0)
     datanum['t_out', :] = spot
     datanum['spot', :] = out_temp
+    datanum['t_min', :] = t_min
+    datanum['t_desired', :] = t_desired
 
     # define upper lower bound on decision variables
     ubw = w(+inf)

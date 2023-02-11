@@ -166,6 +166,30 @@ def generate_noise_trajectories(timesteps):
     
     return noise
 
+def get_temperature_settings(dt, start):
+    times = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24]
+    min_temps = [17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17]
+    desired_temps = [18, 18, 18, 18, 18, 19, 21.5, 21.5, 21.5, 21.5, 21.5, 21.5, 21.5, 21.5, 21.5, 21.5, 21.5, 21.5, 21.5, 21.5, 21.5, 21.5, 21.5, 20, 19]
+
+    # interpolate temperature references
+    timeInterp = []
+    for k in range(len(dt)):
+        timeAbs = start + timedelta(minutes=dt[k])
+        timeInterp.append(np.mod(timeAbs.hour + timeAbs.minute / 60.0, 24))
+
+    f = scinterp.interp1d(
+        np.array(times),
+        np.array(min_temps),
+        kind='nearest')
+    t_min = list(f(np.array(timeInterp)))
+
+    f = scinterp.interp1d(
+        np.array(times),
+        np.array(desired_temps),
+        kind="nearest")
+    t_desired = list(f(np.array(timeInterp)))
+
+    return t_min, t_desired
 def plot(df_history, start, stop, spot):
     timesteps  = list(df_history.index.values[start:stop])
     fig, (ax1, ax2) = plt.subplots(2)
