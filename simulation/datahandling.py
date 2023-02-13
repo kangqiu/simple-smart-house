@@ -190,10 +190,11 @@ def get_temperature_settings(dt, start):
     t_desired = list(f(np.array(timeInterp)))
 
     return t_min, t_desired
-def plot(df_history, start, stop, spot):
+def plot(df_history, start, stop):
     timesteps  = list(df_history.index.values[start:stop])
     fig, (ax1, ax2) = plt.subplots(2)
-    ax1.plot(timesteps, [21] * len(timesteps), label='t_desired')
+    ax1.plot(timesteps, df_history['t_desired'].values.tolist()[start:stop], label='t_desired')
+    ax1.plot(timesteps, df_history['t_min'].values.tolist()[start:stop], label='t_min')
     ax1.plot(timesteps, df_history['room'].values.tolist()[start:stop], label='t_room')
     ax1.plot(timesteps, df_history['target'].values.tolist()[start:stop], label="t_set")
     ax1.set_xticklabels([])
@@ -214,7 +215,7 @@ def plot(df_history, start, stop, spot):
     ax3 = ax2.twinx()
     ax3.set_ylabel("spot pricing", color='orange')
     ax3.plot(
-        timesteps, spot[start:stop],
+        timesteps, df_history['spot_price'].values.tolist()[start:stop],
         label="Spot",
         color='orange'
     )
