@@ -99,34 +99,36 @@ def get_spot_data(start, stop, dt_N):
     return prices
 
 def get_outside_temperature(start, stop, dt_N):
-    met_data = pkl.load(
-            open(os.path.join(cfg.temp_file), 'rb')
-        )
-    seklima = pd.DataFrame.from_dict(met_data)
+    # met_data = pkl.load(
+    #         open(os.path.join(cfg.temp_file), 'rb')
+    #     )
+    # seklima = pd.DataFrame.from_dict(met_data)
+    #
+    # # convert timezones
+    # seklima['Time'] = seklima['Time'].dt.tz_convert(cfg.local_timezone)
+    #
+    # # rename and drop columns
+    # # seklima = seklima.drop(
+    # #    columns=["Duggpunktstemperatur", "Relativ luftfuktighet"]
+    # # )
+    # seklima = seklima.rename(columns={"Lufttemperatur": "temperature"})
+    #
+    # mask = (seklima["Time"] >= start) & (seklima["Time"] <= stop)
+    #
+    # data = seklima.loc[mask]
+    #
+    # met_data = data.to_dict(orient="list")
+    #
+    # # Interpolate outside temperature for simulation
+    # met_time = []
+    # for ts in met_data["Time"]:
+    #     delta = ts - met_data["Time"][0]
+    #     met_time.append(delta.total_seconds() / 60)
+    # outtemp = list(
+    #     np.interp(dt_N, met_time, met_data["temperature"])
+    #     )
 
-    # convert timezones
-    seklima['Time'] = seklima['Time'].dt.tz_convert(cfg.local_timezone)
-
-    # rename and drop columns
-    # seklima = seklima.drop(
-    #    columns=["Duggpunktstemperatur", "Relativ luftfuktighet"]
-    # )
-    seklima = seklima.rename(columns={"Lufttemperatur": "temperature"})
-
-    mask = (seklima["Time"] >= start) & (seklima["Time"] <= stop)
-
-    data = seklima.loc[mask]
-
-    met_data = data.to_dict(orient="list")
-
-    # Interpolate outside temperature for simulation
-    met_time = []
-    for ts in met_data["Time"]:
-        delta = ts - met_data["Time"][0]
-        met_time.append(delta.total_seconds() / 60)
-    outtemp = list(
-        np.interp(dt_N, met_time, met_data["temperature"])
-        )
+    outtemp = [cfg.set_t_out] * len(dt_N)
 
     return outtemp
 

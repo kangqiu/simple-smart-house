@@ -59,9 +59,9 @@ def main():
 
     # initialize history
     history = {
-    'room': 17.0,
+    'room': 20.0,
     'wall': 14.3,
-    'target': 0,
+    'target': 20,
     'room_noise': 0,
     'power_noise': 0,
     't_min': 17,
@@ -105,6 +105,7 @@ def main():
     pkl.dump(df_history, f, protocol=2)
     f.close()
 
+    print("Results saved")
 
 
 

@@ -20,22 +20,34 @@ import numpy as np
 # file imports
 import datahandling
 ################################################################################################
-# TODO: fix weights and simulate 3 days
-# TODO: delete noise and see how it performs
-# TODO: run an entire month of January
+
 # data
 local_timezone = pytz.timezone('Europe/Oslo')
 n_mpc = 288 #24 hour prediction window
 start = dt.datetime(2022, 1, 1, 0, 0).astimezone(local_timezone)
-stop = dt.datetime(2022, 2, 1, 0, 0).astimezone(local_timezone)
+stop = dt.datetime(2022, 1, 2, 0, 0).astimezone(local_timezone)
 # outside temperature data
-temp_file = './data/SEKLIMAData_2022.pkl'
+# temp_file = './data/SEKLIMAData_2022.pkl'
+set_t_out = -5 # in ˚C
 spot_file = './data/SpotData2022_Trheim.pkl'
-noise_file = './data/noise_january_v2.pkl'
+noise_file = './data/noise/01_training_january.pkl'
 add_noise = True
 # results are saved in this file
-results_file = './results/simulation_january_v3.pkl'
+results_file = './results/01_training_january.pkl'
 
+thetal_num = np.array([0.0, 1.0, 1.0, 1.0, 1.0, 1.0])
+thetat_num = np.array([1,1,0])
+thetam_num = np.array([1,1,0,1,1,0,1,1,1,0])
+
+# thetal_num = np.array([-0.00741362, 0.99999878, 0.99995227, 1., 0.99999988, 0.99996614])
+# thetat_num = np.array([1.0,1.0,0.0])
+# thetam_num = np.array([ 9.99710662e-01, 9.99710662e-01, -2.29480829e-04, 1.00000144e+00, 9.99997029e-01,
+#                         -1.55208281e-04,  1.00000667e+00,  1.00004064e+00, 9.99928014e-01, -1.67576327e-03]
+
+# thetal_num = np.array([-0.00741362, 0.99999878, 0.99995227, 1., 0.99999988, 0.99996614])
+# thetat_num = np.array([1.0,1.0,0.0])
+# thetam_num = np.array([ 9.99710662e-01, 9.99710662e-01, -2.29480829e-04, 1.00000144e+00, 9.99997029e-01,
+#                         -1.55208281e-04, 1.00000667e+00, 1.00004064e+00, 9.99928014e-01, -1.67576327e-03])
 
 ################################################################################################
 
@@ -71,27 +83,21 @@ hppow = powsat - log(1 + exp(ReLu * (powsat - maxpow))) / ReLu
 satpower = Function('satpower', [unsatpower], [hppow])
 
 #temperature prediction model
-m_air = 31.02679204362912 #+ 30
-m_wall = 67.21826736655125 #+ 20
-rho_in = 0.36409940390361406 #+ 1
-rho_out = 0.03348756113438382 #+ 0.1
-rho_dir = 0.03348756179891388 #+ 0.1
+m_air = 31.02679204362912
+m_wall = 67.21826736655125
+rho_in = 0.36409940390361406
+rho_out = 0.03348756113438382 
+rho_dir = 0.03348756179891388
 
-# COP = 3
-# COP0, COP1, T0 = (4, 0.1, 10)
-# COP = (COP0 - np.log(1 + np.exp(ReLu * COP1 * (T0 - t_out))) /ReLu)
-# COP = Function('COP', [t_out], [COP])
-COP = 3
-# rho_out_wall = 4.9819e-4
-# rho_in_wall = 5.416673e-3
+COP = 3.
+
 rho_out_wall = rho_out/m_wall
 rho_in_wall = rho_in/m_wall
 t_wall_plus =  t_wall + rho_out_wall * (t_out - t_wall) + rho_in_wall * (t_room - t_wall)
 wallplus = Function('wallplus', [t_wall, t_room, t_out], [t_wall_plus])
 
 power_HP = MX.sym('power_HP')
-# rho_in_room = 0.0117 + 0.1
-# rho_dir = 1.0793e-3 + 1e-2
+
 rho_in_room = rho_out/m_air
 rho_dir = rho_dir/m_air
 
@@ -107,15 +113,13 @@ roomplus = Function(
 # mpc config
 
 solver_options = {
-    "linear_solver": "ma57"
-}  # leave empty if you don't have the HSL solver library installed (highly recommended!)
+    # "linear_solver": "ma57"
+}
 
 ################################################################################################
 # mpc equations
 # objective function parameterization
-thetal_num = np.array([0.0, 1.0, 1.0, 1.0, 1.0, 1.0])
 thetal = MX.sym('thetal', 6)
-thetat_num = np.array([1,1,0])
 thetat = MX.sym('thetat', 3)
 # MPC model parameterization
 thetam = MX.sym('theta_m', 10)
@@ -171,7 +175,6 @@ t_room_mpc = t_room + thetam[6]*rho_in_room * (t_wall - t_room) + thetam[7] *rho
 
 room_mpc = Function('room_mpc', [t_wall, t_room, t_out, power_HP, cop,  thetam], [t_room_mpc])
 
-thetam_num = np.array([1,1,0,1,1,0,1,1,1,0])
 ################################################################################################
 # noise parameters
 noise = {   'mu' : { 'room': 0, 'power': 0.033},

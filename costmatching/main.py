@@ -88,24 +88,24 @@ def get_Qbase():
 
     return Qbase_func
 
-def create_batches(df_history):
-    timesteps = list(range(len(df_history) - max(cfg.n_rl, cfg.n_mpc)))
-    b_split = list(datahandling.split(timesteps, cfg.n_batches))
-    batches = []
-    for b in b_split:
-        end = b[0] + cfg.len_batches
-        if end > timesteps[-1]:
-            end = timesteps[-1]
-        batch = timesteps[b[0]:end]
-        batches.append(batch)
+# def create_batches(df_history):
+#     timesteps = list(range(len(df_history) - max(cfg.n_rl, cfg.n_mpc)))
+#     b_split = list(datahandling.split(timesteps, cfg.n_batches))
+#     batches = []
+#     for b in b_split:
+#         end = b[0] + cfg.len_batches
+#         if end > timesteps[-1]:
+#             end = timesteps[-1]
+#         batch = timesteps[b[0]:end]
+#         batches.append(batch)
+#
+#     return batches
 
-    return batches
-
-# def constrained_w_update(dQ, theta):
-#     w = MX.sym('w', 3)
-#     param = MX.sym('param', 2, 3)
+# def constrained_w_update(dQ, theta, alpha):
+#     w = theta
+#     param = MX.sym('param', 2, len(dQ))
 #     param_num = np.stack((dQ, theta))
-#     J = 0.5 * dot(w, w) / self.alpha['w'] + dot(param[0, :].T, w)
+#     J = 0.5 * dot(w, w) / alpha['w'] + dot(param[0, :].T, w)
 #
 #     g = sum1(param[1, :].T + w)
 #     lbg = 1
@@ -114,7 +114,6 @@ def create_batches(df_history):
 #     LS = {'f': J, 'x': w, 'g': g, 'p': param}
 #     options = {'print_time': 0}
 #     options['ipopt'] = {'linear_solver': 'ma27',
-#                         'hsllib': '/Users/kqiu/ThirdParty-HSL/.libs/libcoinhsl.dylib',
 #                         'print_level': 0}
 #     solverLS = nlpsol('solver', 'ipopt', LS, options)
 #
@@ -138,51 +137,52 @@ def main():
     Qbase = get_Qbase()
     # to test: Qbase(t_desired_num[0:cfg.n_rl], room_num[0:cfg.n_rl], t_min_num[0:cfg.n_rl], dt_set_num[0:cfg.n_rl], power_num[0:cfg.n_rl], spot_num[0:cfg.n_rl])
 
-    batches = create_batches(df_history)
+    # batches = create_batches(df_history)
+    batch = list(range(len(df_history) - max(cfg.n_rl, cfg.n_mpc)))
     # nest into episodes
     loss_over_episodes = []
     for e, index in enumerate(tqdm(range(cfg.episodes))):
         #iterate through batches
         loss_per_episode = 0
-        for b in range(len(batches)):
-            batch = batches[b]
+        for ts in batch:
+        # for b in range(len(batches)):
+        #     batch = batches[b]
             dthetal_batch = 0
             dthetam_batch = 0
             dthetat_batch = 0
             loss_per_batch = 0
-            for ts in batch:
-                #collect Qmpc per timestep in batch
-                qmpc = Qmpc(room_num[ts], wall_num[ts], power_num[ts], dt_set_num[ts:ts+cfg.n_mpc],
-                                   t_set_num[ts:ts+cfg.n_mpc],t_desired_num[ts:ts+cfg.n_mpc], t_min_num[ts:ts+cfg.n_mpc],
-                                   t_out_num[ts:ts+cfg.n_mpc], spot_num[ts:ts+cfg.n_mpc], thetal_num, thetam_num,thetat_num )
-                qbase = Qbase(t_desired_num[ts:ts+cfg.n_rl], room_num[ts:ts+cfg.n_rl], t_min_num[ts:ts+cfg.n_rl],
-                                     dt_set_num[ts:ts+cfg.n_rl], power_num[ts:ts+cfg.n_rl], spot_num[ts:ts+cfg.n_rl])
-                loss = (0.5*(qmpc-qbase)**2).full().flatten()[0]/ len(batch)
+            #collect Qmpc per timestep in batch
+            qmpc = Qmpc(room_num[ts], wall_num[ts], power_num[ts], dt_set_num[ts:ts+cfg.n_mpc],
+                               t_set_num[ts:ts+cfg.n_mpc],t_desired_num[ts:ts+cfg.n_mpc], t_min_num[ts:ts+cfg.n_mpc],
+                               t_out_num[ts:ts+cfg.n_mpc], spot_num[ts:ts+cfg.n_mpc], thetal_num, thetam_num,thetat_num )
+            qbase = Qbase(t_desired_num[ts:ts+cfg.n_rl], room_num[ts:ts+cfg.n_rl], t_min_num[ts:ts+cfg.n_rl],
+                                 dt_set_num[ts:ts+cfg.n_rl], power_num[ts:ts+cfg.n_rl], spot_num[ts:ts+cfg.n_rl])
+            loss = (0.5*(qmpc-qbase)**2).full().flatten()[0]/ len(batch)
 
-                dQl = dQmpc_l(room_num[ts], wall_num[ts], power_num[ts], dt_set_num[ts:ts + cfg.n_mpc],
-                              t_set_num[ts:ts + cfg.n_mpc], t_desired_num[ts:ts + cfg.n_mpc], t_min_num[ts:ts + cfg.n_mpc],
-                              t_out_num[ts:ts + cfg.n_mpc], spot_num[ts:ts + cfg.n_mpc], thetal_num, thetam_num, thetat_num).full().flatten()
-                dQm = dQmpc_m(room_num[ts], wall_num[ts], power_num[ts], dt_set_num[ts:ts + cfg.n_mpc],
-                              t_set_num[ts:ts + cfg.n_mpc], t_desired_num[ts:ts + cfg.n_mpc],
-                              t_min_num[ts:ts + cfg.n_mpc],
-                              t_out_num[ts:ts + cfg.n_mpc], spot_num[ts:ts + cfg.n_mpc], thetal_num, thetam_num,
-                              thetat_num).full().flatten()
-                dQt = dQmpc_t(room_num[ts], wall_num[ts], power_num[ts], dt_set_num[ts:ts + cfg.n_mpc],
-                              t_set_num[ts:ts + cfg.n_mpc], t_desired_num[ts:ts + cfg.n_mpc],
-                              t_min_num[ts:ts + cfg.n_mpc],
-                              t_out_num[ts:ts + cfg.n_mpc], spot_num[ts:ts + cfg.n_mpc], thetal_num, thetam_num,
-                              thetat_num).full().flatten()
-                dthetal_batch -= loss * dQl
-                dthetam_batch -= loss * dQm
-                dthetat_batch -= loss * dQt
-                loss_per_batch += loss
-            # TODO: constrained update
+            dQl = dQmpc_l(room_num[ts], wall_num[ts], power_num[ts], dt_set_num[ts:ts + cfg.n_mpc],
+                          t_set_num[ts:ts + cfg.n_mpc], t_desired_num[ts:ts + cfg.n_mpc], t_min_num[ts:ts + cfg.n_mpc],
+                          t_out_num[ts:ts + cfg.n_mpc], spot_num[ts:ts + cfg.n_mpc], thetal_num, thetam_num, thetat_num).full().flatten()
+            dQm = dQmpc_m(room_num[ts], wall_num[ts], power_num[ts], dt_set_num[ts:ts + cfg.n_mpc],
+                          t_set_num[ts:ts + cfg.n_mpc], t_desired_num[ts:ts + cfg.n_mpc],
+                          t_min_num[ts:ts + cfg.n_mpc],
+                          t_out_num[ts:ts + cfg.n_mpc], spot_num[ts:ts + cfg.n_mpc], thetal_num, thetam_num,
+                          thetat_num).full().flatten()
+            dQt = dQmpc_t(room_num[ts], wall_num[ts], power_num[ts], dt_set_num[ts:ts + cfg.n_mpc],
+                          t_set_num[ts:ts + cfg.n_mpc], t_desired_num[ts:ts + cfg.n_mpc],
+                          t_min_num[ts:ts + cfg.n_mpc],
+                          t_out_num[ts:ts + cfg.n_mpc], spot_num[ts:ts + cfg.n_mpc], thetal_num, thetam_num,
+                          thetat_num).full().flatten()
+            dthetal_batch -= loss * dQl
+            dthetam_batch -= loss * dQm
+            dthetat_batch -= loss * dQt
+            loss_per_batch += loss
+        # TODO: constrained update -> might not be necessary?
             if cfg.constrained_update:
                 pass
             else:
-                thetal_num += cfg.alphal * dthetal_batch / len(batches)
-                thetam_num += cfg.alpham * dthetam_batch / len(batches)
-                thetat_num += cfg.alphat * dthetat_batch / len(batches)
+                thetal_num += cfg.alphal * dthetal_batch
+                thetam_num += cfg.alpham * dthetam_batch
+                thetat_num += cfg.alphat * dthetat_batch
             loss_per_episode += loss_per_batch
         loss_over_episodes.append(loss_per_episode)
     print(thetal_num)

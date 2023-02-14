@@ -152,8 +152,8 @@ def get_step(w, lbg, ubg, data, state0, solverMPC, spot, out_temp, t_min, t_desi
     # get numerical data
     #forecasts = datahandling.get_mpc_data(time)
     datanum = data(0)
-    datanum['t_out', :] = spot
-    datanum['spot', :] = out_temp
+    datanum['t_out', :] = out_temp
+    datanum['spot', :] = spot
     datanum['t_min', :] = t_min
     datanum['t_desired', :] = t_desired
 

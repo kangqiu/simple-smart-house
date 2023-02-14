@@ -10,18 +10,14 @@ import numpy as np
 import datahandling
 ################################################################################################
 # data
-
-local_timezone = pytz.timezone('Europe/Oslo')
-config = {'start': dt.datetime(2021, 11, 29).astimezone(local_timezone),
-          'stop': dt.datetime(2021, 12, 8).astimezone(local_timezone)}  # 9,25
 n_mpc = 24 * 12 #24h
-n_rl = 48 * 12 #48h
+n_rl = 24 * 12 #24h
 n_batches = 31 #days
 len_batches = 288*5 #2 days length batchsize
 #results are saved in this file
 results_file = '../results/simulation_january_v3.pkl'
 
-gamma = 0.995
+gamma = 1
 episodes = 100
 
 #stepsize of Q-update
