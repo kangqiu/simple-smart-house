@@ -25,7 +25,7 @@ import datahandling
 local_timezone = pytz.timezone('Europe/Oslo')
 n_mpc = 288 #24 hour prediction window
 start = dt.datetime(2022, 1, 1, 0, 0).astimezone(local_timezone)
-stop = dt.datetime(2022, 2, 2, 0, 0).astimezone(local_timezone)
+stop = dt.datetime(2022, 1, 3, 0, 0).astimezone(local_timezone)
 # outside temperature data
 # temp_file = './data/SEKLIMAData_2022.pkl'
 set_t_out = -5 # in ˚C
@@ -113,6 +113,7 @@ roomplus = Function(
 # mpc config
 
 solver_options = {
+    'print_level': 3
     # "linear_solver": "ma57"
 }
 
