@@ -86,3 +86,7 @@ cython_debug/
 
 pyvenv.cfg
 bin/
+
+lib/
+lib64
+share/
