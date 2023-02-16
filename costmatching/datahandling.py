@@ -19,8 +19,30 @@ import matplotlib.pyplot as plt
 
 ################################################################################################
 # file imports
-import config_sim as cfg
+import config_cost as cfg
+def split(a, n):
+    k, m = divmod(len(a), n)
+    return (a[i*k+min(i, m):(i+1)*k+min(i+1, m)] for i in range(n))
 
+def rolling_horizon_split(timesteps, n, l):
+    batches = []
+    for i in range(0, len(timesteps), l):
+        end = i + l
+        if end + l > len(timesteps):
+            end = len(timesteps)
+        batch = timesteps[i:end]
+        batches.append(batch)
+    return batches[:n]
+
+def get_dtset(tset):
+    dtset = [0]
+    for i in range(0, len(tset)-1):
+        dtset.append(tset[i+1] - tset[i])
+    return np.array(dtset)
+def read_results():
+    with open(cfg.results_file, 'rb') as handle:
+        history = pkl.load(handle)
+    return history
 def get_time():
     """
         creates list of timesteps based on user set start and stop time of simulation
@@ -128,7 +150,7 @@ def get_outside_temperature(start, stop, dt_N):
     #     np.interp(dt_N, met_time, met_data["temperature"])
     #     )
 
-    outtemp = [cfg.set_t_out] * len(dt_N)
+    outtemp = [cfg.t_out] * len(dt_N)
 
     return outtemp
 
