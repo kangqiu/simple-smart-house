@@ -13,6 +13,8 @@ configuration file for
 
 ################################################################################################
 # package imports
+import os
+
 from casadi.tools import *
 import pytz
 import datetime as dt
@@ -29,9 +31,10 @@ n_mpc = 288 #24 hour prediction window
 start = dt.datetime(2022, 1, 1, 0, 0).astimezone(local_timezone)
 stop = dt.datetime(2022, 2, 1, 0, 0).astimezone(local_timezone)
 # outside temperature data
-temp_file = './data/SEKLIMAData_2022.pkl'
+print(os.getcwd())
+temp_file = '../data/SEKLIMAData_2022.pkl'
 # spot data
-spot_file = './data/SpotData2022_Trheim.pkl'
+spot_file = '../data/SpotData2022_Trheim.pkl'
 
 #set outside temperature and spot price constant for now
 t_out_data = [5] * 288 * (7+1)
@@ -104,7 +107,7 @@ w_tmin = 50
 w_hp = 0.01 #actuation penalty
 
 solver_options = {
-    "linear_solver": "ma27"
+    # "linear_solver": "ma27"
 }  # leave empty if you don't have the HSL solver library installed (highly recommended!)
 
 ################################################################################################
