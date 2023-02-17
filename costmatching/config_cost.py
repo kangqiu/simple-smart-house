@@ -15,17 +15,19 @@ n_rl = 24 * 12 #24h
 n_batches = 31 #days
 len_batches = 288*5 #2 days length batchsize
 #results are saved in this file
-results_file = '../results/simulation_january_v3.pkl'
+results_file = '../results/01_training_january.pkl'
 
 gamma = 1
-episodes = 100
+episodes = 3
 
 #stepsize of Q-update
-alphal = 2e-6
-alpham = 2e-6
-alphat = 2e-6
+alphal = np.array([0, 1e-3, 1e-3, 1e-3, 1e-3, 1e-3])
+alpham = 1e-15
+alphat = 1e-15
 
 constrained_update = False
+
+use_ipopt = True
 
 ################################################################################################
 # declaring parametrization

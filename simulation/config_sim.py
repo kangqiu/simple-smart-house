@@ -25,7 +25,7 @@ import datahandling
 local_timezone = pytz.timezone('Europe/Oslo')
 n_mpc = 288 #24 hour prediction window
 start = dt.datetime(2022, 1, 1, 0, 0).astimezone(local_timezone)
-stop = dt.datetime(2022, 1, 2, 0, 0).astimezone(local_timezone)
+stop = dt.datetime(2022, 2, 3, 0, 0).astimezone(local_timezone)
 # outside temperature data
 # temp_file = './data/SEKLIMAData_2022.pkl'
 set_t_out = -5 # in ˚C
@@ -33,21 +33,27 @@ spot_file = './data/SpotData2022_Trheim.pkl'
 noise_file = './data/noise/01_training_january.pkl'
 add_noise = True
 # results are saved in this file
-results_file = './results/01_training_january.pkl'
+results_file = './results/01_validation_thetal_thetat_thetam_january.pkl'
 
-thetal_num = np.array([0.0, 1.0, 1.0, 1.0, 1.0, 1.0])
-thetat_num = np.array([1,1,0])
-thetam_num = np.array([1,1,0,1,1,0,1,1,1,0])
+# thetal_num = np.array([0.0, 1.0, 1.0, 1.0, 1.0, 1.0])
+# thetat_num = np.array([1,1,0])
+# thetam_num = np.array([1,1,0,1,1,0,1,1,1,0])
 
-# thetal_num = np.array([-0.00741362, 0.99999878, 0.99995227, 1., 0.99999988, 0.99996614])
-# thetat_num = np.array([1.0,1.0,0.0])
-# thetam_num = np.array([ 9.99710662e-01, 9.99710662e-01, -2.29480829e-04, 1.00000144e+00, 9.99997029e-01,
-#                         -1.55208281e-04,  1.00000667e+00,  1.00004064e+00, 9.99928014e-01, -1.67576327e-03]
+### thetal only update
+# thetal_num = np.array([2.48849822e-02, 2.07065433e-06, 1.66061386e-08, 9.16721007e+00,
+#  1.85058337e-06, 1.03191752e-07])
 
-# thetal_num = np.array([-0.00741362, 0.99999878, 0.99995227, 1., 0.99999988, 0.99996614])
-# thetat_num = np.array([1.0,1.0,0.0])
-# thetam_num = np.array([ 9.99710662e-01, 9.99710662e-01, -2.29480829e-04, 1.00000144e+00, 9.99997029e-01,
-#                         -1.55208281e-04, 1.00000667e+00, 1.00004064e+00, 9.99928014e-01, -1.67576327e-03])
+### thetal and thetat update
+# thetal_num = np.array([1.67087180e-02, 2.04981067e-06, 1.64224271e-08, 9.16667529e+00,
+#  1.86246588e-06, 2.79991023e-07])
+# thetat_num = np.array([4.48816786e-06, 9.93365944e+03, 2.35287579e+00])
+
+### all theta update
+thetal_num = np.array([-9.48480538e-09, 2.32942549e-05, 3.57584622e+00, 3.42833995e-01,
+                       1.67156928e-06, 1.26782589e-09])
+thetat_num = np.array([3.33918549e+01, 7.39948207e+00, 1.37860855e-07])
+thetam_num = np.array([1.06836231e+00, 1.06835997e+00, 4.06453049e-09, 3.23100860e+01, 7.47575880e+01,
+                       1.59959076e+00, 2.19555319e-07, 2.73700566e+00, 5.26009779e-01, -8.60824757e-09])
 
 ################################################################################################
 
@@ -113,7 +119,7 @@ roomplus = Function(
 # mpc config
 
 solver_options = {
-    # "linear_solver": "ma57"
+    "linear_solver": "ma57"
 }
 
 ################################################################################################
