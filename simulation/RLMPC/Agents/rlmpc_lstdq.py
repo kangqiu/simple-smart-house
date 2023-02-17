@@ -213,7 +213,7 @@ class Custom_QP_formulation:
         # xxxxxxxxxxxxxxxxxx
 
         # initial model
-        xn = self.env.model_mpc(self.x, self.U[:, 0], self.T_OUT[0], self.theta_model)
+        xn = self.env.model_mpc(self.x, self.U[:, 0], self.theta_model)
         J += self.gamma ** 0 * (self.spot_cost(self.x, self.theta, self.PRICE[0]) + self.act_cost(self.U[:, 0], self.theta))
 
         for i in range(self.N - 1):
@@ -222,7 +222,7 @@ class Custom_QP_formulation:
 
             # model equality
             g.append(self.X[:, i] - xn)
-            xn = self.env.model_mpc(self.X[:, i], self.U[:, i + 1], self.T_OUT[i + 1], self.theta_model)
+            xn = self.env.model_mpc(self.X[:, i], self.U[:, i + 1], self.theta_model)
 
             # sys inequalities
             hx.append(self.T_DESIRED[i] - self.X[0, i] - self.SIGMA[0, i])  # slack
