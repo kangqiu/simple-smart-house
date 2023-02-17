@@ -188,3 +188,4 @@ noise = {   'mu' : { 'room': 0, 'power': 0.033},
             'beta': { 'room': 0.99, 'power': 0.92},
             'epsilon': { 'room': 0.73, 'power':  0.68},
 }
+
