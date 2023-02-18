@@ -56,18 +56,16 @@ def get_Qmpc():
         wall = wall_pred
         room = room_pred
 
-    t_mpc = cfg.tmpc_func(room[-1], tdesired[-1], tmin[-1], cfg.thetat)
+    t_mpc = cfg.tmpc_func(room[-1], tdesired[-1], tmin[-1], cfg.thetal)
     Qmpc += t_mpc
     Qmpc_func = Function('Qmpc_func',
-                         [room0, wall0, power0, dtset, tset, tdesired, tmin, tout, spot, cfg.thetal, cfg.thetam, cfg.thetat],
+                         [room0, wall0, power0, dtset, tset, tdesired, tmin, tout, spot, cfg.thetal, cfg.thetam],
                          [Qmpc])
     dQmpc_l = Qmpc_func.factory('dQmpc_func', ['i0', 'i1', 'i2', 'i3', 'i4', 'i5', 'i6', 'i7', 'i8',
-                                               'i9', 'i10', 'i11'], ['jac:o0:i9'])
+                                               'i9', 'i10'], ['jac:o0:i9'])
     dQmpc_m = Qmpc_func.factory('dQmpc_func', ['i0', 'i1', 'i2', 'i3', 'i4', 'i5', 'i6', 'i7', 'i8',
-                                               'i9', 'i10', 'i11'], ['jac:o0:i10'])
-    dQmpc_t = Qmpc_func.factory('dQmpc_func', ['i0', 'i1', 'i2', 'i3', 'i4', 'i5', 'i6', 'i7', 'i8',
-                                               'i9', 'i10', 'i11'], ['jac:o0:i11'])
-    return Qmpc_func, dQmpc_l, dQmpc_m, dQmpc_t
+                                               'i9', 'i10'], ['jac:o0:i10'])
+    return Qmpc_func, dQmpc_l, dQmpc_m
 
 def get_Qbase():
     # measured states
@@ -118,11 +116,11 @@ def check_gradient(dQ, Q, room0, wall0, power0, dt_set, t_set, t_desired, t_min,
 
         if gradient_type == 'l':
             q_per = float(Q(room0, wall0, power0, dt_set, t_set,t_desired, t_min, t_out, spot, theta_perturbed,
-                           cfg.thetam_num, cfg.thetat_num).full().flatten())
+                           cfg.thetam_num, cfg.thetal_num).full().flatten())
 
         elif gradient_type == 'm':
             q_per = float(Q(room0, wall0, power0, dt_set, t_set, t_desired, t_min, t_out, spot, cfg.thetal_num,
-                            theta_perturbed, cfg.thetat_num).full().flatten())
+                            theta_perturbed, cfg.thetal_num).full().flatten())
         dq = dQ_num * (theta_perturbed - theta)
 
         delta_Q.append(q_per - Q_num)
@@ -161,14 +159,13 @@ def check_gradient(dQ, Q, room0, wall0, power0, dt_set, t_set, t_desired, t_min,
 def main():
     # get data in order
     thetal_num = cfg.thetal_num
-    thetat_num = cfg.thetat_num
     thetam_num = cfg.thetam_num
 
     df_history = datahandling.read_results()
     t_set_num, dt_set_num, t_out_num, t_desired_num, t_min_num, spot_num, room_num, power_num, wall_num= get_numerical_data(df_history)
 
     #build symbolic casadi function to evaluate predicted Q by one (1) MPC iteration
-    Qmpc, dQmpc_l, dQmpc_m, dQmpc_t = get_Qmpc()
+    Qmpc, dQmpc_l, dQmpc_m = get_Qmpc()
     # to test: Qmpc(12, 12, 0, dt_set_num[0:288], t_set_num[0:288], t_desired_num[0:288], t_min_num[0:288], t_out_num[0:288], spot_num[0:288], cfg.thetal_num, cfg.thetam_num)
     Qbase = get_Qbase()
     # to test: Qbase(t_desired_num[0:cfg.n_rl], room_num[0:cfg.n_rl], t_min_num[0:cfg.n_rl], dt_set_num[0:cfg.n_rl], power_num[0:cfg.n_rl], spot_num[0:cfg.n_rl])
@@ -176,21 +173,21 @@ def main():
     batch = list(range(len(df_history) - 2 * max(cfg.n_rl, cfg.n_mpc)))
 
     if cfg.use_ipopt == True:
-        w = MX.sym('w', int(len(cfg.thetal_num) + len(cfg.thetat_num) + len(cfg.thetam_num)))
+        w = MX.sym('w', int(len(cfg.thetal_num)) )#  + len(cfg.thetam_num)))
 
         J = 0
         for ts in batch:
             J += 0.5 * (Qmpc(room_num[ts], wall_num[ts], power_num[ts], dt_set_num[ts:ts + cfg.n_mpc],
                              t_set_num[ts:ts + cfg.n_mpc], t_desired_num[ts:ts + cfg.n_mpc],
                              t_min_num[ts:ts + cfg.n_mpc],
-                             t_out_num[ts:ts + cfg.n_mpc], spot_num[ts:ts + cfg.n_mpc], w[0:6], w[9:19], w[6:9])
+                             t_out_num[ts:ts + cfg.n_mpc], spot_num[ts:ts + cfg.n_mpc], w[0:9], cfg.thetam_num)
                         - Qbase(t_desired_num[ts:ts + cfg.n_rl], room_num[ts:ts + cfg.n_rl],
                                 t_min_num[ts:ts + cfg.n_rl],
                                 dt_set_num[ts:ts + cfg.n_rl], power_num[ts:ts + cfg.n_rl],
                                 spot_num[ts:ts + cfg.n_rl])) ** 2 / len(batch)
         #
-        ubw = [+inf] * int(len(cfg.thetal_num) + len(cfg.thetat_num) + len(cfg.thetam_num))
-        lbw = [0] * int(len(cfg.thetal_num) + len(cfg.thetat_num) + len(cfg.thetam_num))
+        ubw = [+inf] * int(len(cfg.thetal_num) ) # + len(cfg.thetam_num))
+        lbw = [0] * int(len(cfg.thetal_num) ) # + len(cfg.thetam_num))
 
         g = []
         lbg = []
@@ -201,7 +198,8 @@ def main():
         options['ipopt'] = {'linear_solver': 'ma57',
                             'max_iter': 200}
         solverLS = nlpsol('solver', 'ipopt', LS, options)
-        w0 = d=np.concatenate((cfg.thetal_num, cfg.thetat_num, cfg.thetam_num), axis=None)
+        # w0 = np.concatenate((cfg.thetal_num, cfg.thetam_num), axis=None)
+        w0 = cfg.thetal_num
 
         sol = solverLS(x0=w0, lbx=lbw, ubx=ubw, lbg=lbg, ubg=ubg, p=[])
         w_opt = sol['x'].full().flatten()

@@ -18,7 +18,7 @@ import datahandling
 import config_sim as cfg
 
 #read results file
-results_file = './results/01_validation_thetal_thetat_thetam_january.pkl'
+results_file = './results/newsat/01_training_january.pkl'
 df_history = pkl.load(open(os.path.join(results_file), 'rb'))
 
 #plot

@@ -30,18 +30,20 @@ stop = dt.datetime(2022, 2, 3, 0, 0).astimezone(local_timezone)
 # temp_file = './data/SEKLIMAData_2022.pkl'
 set_t_out = -5 # in ˚C
 spot_file = './data/SpotData2022_Trheim.pkl'
-noise_file = './data/noise/01_training_january.pkl'
+noise_file = './data/noise/02_test_january.pkl'
 add_noise = True
 # results are saved in this file
-results_file = './results/01_validation_thetal_thetat_thetam_january.pkl'
+results_file = './results/newsat/02_validation_january.pkl'
 
-# thetal_num = np.array([0.0, 1.0, 1.0, 1.0, 1.0, 1.0])
-# thetat_num = np.array([1,1,0])
-# thetam_num = np.array([1,1,0,1,1,0,1,1,1,0])
+# thetal_num = np.array([0.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 0.0 ])
+thetal_num  =np.array( [-9.07856401e-09, 2.29755966e-04, 1.37293490e+00, 3.39479470e-02,
+  8.40209197e+00,  1.67699285e+00,  1.20192967e-04,  2.02525568e+00,
+  2.54452296e-07])
+thetam_num = np.array([1.0, 0.0, 1.0, 1.0, 0.0, 1.0, 1.0, 1.0, 0.0])
 
 ### thetal only update
 # thetal_num = np.array([2.48849822e-02, 2.07065433e-06, 1.66061386e-08, 9.16721007e+00,
-#  1.85058337e-06, 1.03191752e-07])
+#                        1.85058337e-06, 1.03191752e-07])
 
 ### thetal and thetat update
 # thetal_num = np.array([1.67087180e-02, 2.04981067e-06, 1.64224271e-08, 9.16667529e+00,
@@ -84,8 +86,13 @@ power = Function(
 )
 
 unsatpower = MX.sym('unsatpower')
-powsat = log(1 + exp(ReLu * unsatpower)) / ReLu
-hppow = powsat - log(1 + exp(ReLu * (powsat - maxpow))) / ReLu
+# powsat = log(1 + exp(ReLu * unsatpower)) / ReLu
+# hppow = powsat - log(1 + exp(ReLu * (powsat - maxpow))) / ReLu
+
+# new saturation function
+alpha = 0.1
+powsat = 0.5 * (unsatpower + maxpow - sqrt((unsatpower - maxpow)**2 + alpha))
+hppow = 0.5 * (powsat + sqrt(powsat ** 2 + alpha))
 satpower = Function('satpower', [unsatpower], [hppow])
 
 #temperature prediction model
@@ -119,16 +126,15 @@ roomplus = Function(
 # mpc config
 
 solver_options = {
-    "linear_solver": "ma57"
+    #"linear_solver": "ma57"
 }
 
 ################################################################################################
 # mpc equations
 # objective function parameterization
-thetal = MX.sym('thetal', 6)
-thetat = MX.sym('thetat', 3)
+thetal = MX.sym('thetal', 9)
 # MPC model parameterization
-thetam = MX.sym('theta_m', 10)
+thetam = MX.sym('theta_m', 9)
 
 # MPC objective function
 w_spot = 0.1  # weight spot cost
@@ -162,22 +168,22 @@ lmpc_func = Function(
 #parameterized terminal cost function
 
 t_mpc = 0
-t_mpc += (thetat[0] * w_tbelow * slack ** 2 / float(n_mpc))
-t_mpc += (thetat[1] * w_tmin * slackmin ** 2 / float(n_mpc))
-t_mpc += thetat[2]
+t_mpc += (thetal[6] * w_tbelow * slack ** 2 / float(n_mpc))
+t_mpc += (thetal[7] * w_tmin * slackmin ** 2 / float(n_mpc))
+t_mpc += thetal[8]
 
-tmpc_func = Function( 'tmpc_func', [slack, slackmin, thetat], [t_mpc])
+tmpc_func = Function( 'tmpc_func', [slack, slackmin, thetal], [t_mpc])
 
 #parameterized model equations MPC
 # pow_mpc= thetam[0] * HPset * thetam[1]* t_target - HPin * t_room + HP0 +thetam[2]
 pow_mpc = thetam[0] * k * (t_target - t_room) + thetam[1]
 power_mpc = Function('power_mpc', [t_room, t_target, thetam], [pow_mpc])
 
-t_wall_mpc =  t_wall + thetam[3] *rho_out_wall * (t_out - t_wall) + thetam[4] * rho_in_wall * (t_room - t_wall) + thetam[5]
+t_wall_mpc =  t_wall + thetam[2] *rho_out_wall * (t_out - t_wall) + thetam[3] * rho_in_wall * (t_room - t_wall) + thetam[4]
 wall_mpc = Function('wall_mpc', [t_wall, t_room, t_out, thetam], [t_wall_mpc])
 
-t_room_mpc = t_room + thetam[6]*rho_in_room * (t_wall - t_room) + thetam[7] *rho_dir * (t_out - t_room) + thetam[8] *\
-             cop * power_HP * 1/m_air + thetam[9]
+t_room_mpc = t_room + thetam[5]*rho_in_room * (t_wall - t_room) + thetam[6] *rho_dir * (t_out - t_room) + thetam[7] *\
+             cop * power_HP * 1/m_air + thetam[8]
 
 room_mpc = Function('room_mpc', [t_wall, t_room, t_out, power_HP, cop,  thetam], [t_room_mpc])
 

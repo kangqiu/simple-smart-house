@@ -77,7 +77,7 @@ def get_objective(w, data):
             # # J += (w_target * w['input', k, 'dt_target'] ** 2 / float(cfg.n_mpc))
             # J += (w_spot * (data['spot', k] * w['state', k, 'power']) / float(cfg.n_mpc))
     # terminal cost
-    J += cfg.tmpc_func(w['state', -1, 'slack'], w['state', -1, 'slackmin'], cfg.thetat_num)
+    J += cfg.tmpc_func(w['state', -1, 'slack'], w['state', -1, 'slackmin'], cfg.thetal_num)
     # J += (w_tbelow * w['state', -1, 'slack'] ** 2 / float(cfg.n_mpc))
     # J += (w_tmin * w['state', -1, 'slackmin'] ** 2 / float(cfg.n_mpc))
 
@@ -172,6 +172,10 @@ def get_step(w, lbg, ubg, data, state0, solverMPC, spot, out_temp, t_min, t_desi
     sol = solverMPC(
         x0=w0, lbx=lbw, ubx=ubw, lbg=lbg, ubg=ubg, p=datanum
     )
+
+    fl = solverMPC.stats()
+    if not fl["success"]:
+        raise RuntimeError("Solver infeasible")
     w_opt = sol["x"].full().flatten()
 
     w_opt = w(w_opt)
