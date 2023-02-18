@@ -19,8 +19,8 @@ class RLMPC_LSTDQ_Agent:
         # Critic params
         self.n_sfeature = int((self.obs_dim + 2) * (self.obs_dim + 1) / 2)
         self.critic_wt = 0.01 * np.random.rand(self.n_sfeature, 1)
-        # self.adv_wt = 0.01 * np.random.rand(self.actor.actor_wt.shape[0], 1)
-        self.adv_wt = np.array([0, 0, 0, 1, 1, 1, 1])
+        self.adv_wt = 0.01 * np.random.rand(self.actor.actor_wt.shape[0], 1)
+        # self.adv_wt = np.array([0, 0, 0, 1, 1, 1, 1])
 
         # Render prep
         self.fig = None
@@ -159,9 +159,9 @@ class Custom_QP_formulation:
             csd.reshape(self.SIGMA, -1, 1), )
 
         # Symbolic variables for all parameters: uncertainty, price, theta
-        # uncertainty dimension = N
-        self.t_out = csd.MX.sym('t_out')
-        self.T_OUT =  csd.MX.sym("T_OUT", self.N)
+        # # uncertainty dimension = N
+        # self.t_out = csd.MX.sym('t_out')
+        # self.T_OUT =  csd.MX.sym("T_OUT", self.N)
         # price dimension = N
         self.price = csd.MX.sym('price')
         self.PRICE = csd.MX.sym("PRICE", self.N)
@@ -181,10 +181,10 @@ class Custom_QP_formulation:
         self.theta_dim = self.theta.size()[0]
 
         # [Initial state=3, theta params=7, uncertainty=N, price=N, desired temp=N, dt_target=N]
-        self.P = csd.vertcat(self.x, self.theta, csd.reshape(self.T_OUT, -1, 1), csd.reshape(self.PRICE, -1, 1),
+        self.P = csd.vertcat(self.x, self.theta, csd.reshape(self.PRICE, -1, 1),
                              csd.reshape(self.T_DESIRED, -1, 1), csd.reshape(self.T_MIN, -1, 1))
         # note that csd.reshape() is reshaped by column
-        self.p_dim = self.obs_dim + self.theta_dim + 4 * self.N
+        self.p_dim = self.obs_dim + self.theta_dim + 3 * self.N
 
         # cost function
         # self.stage_cost = self.stage_cost_fn()
@@ -213,7 +213,7 @@ class Custom_QP_formulation:
         # xxxxxxxxxxxxxxxxxx
 
         # initial model
-        xn = self.env.model_mpc(self.x, self.U[:, 0], self.T_OUT[0], self.theta_model)
+        xn = self.env.model_mpc(self.x, self.U[:, 0], self.theta_model)
         J += self.gamma ** 0 * (self.spot_cost(self.x, self.theta, self.PRICE[0]) + self.act_cost(self.U[:, 0], self.theta))
 
         for i in range(self.N - 1):
@@ -222,11 +222,13 @@ class Custom_QP_formulation:
 
             # model equality
             g.append(self.X[:, i] - xn)
-            xn = self.env.model_mpc(self.X[:, i], self.U[:, i + 1], self.T_OUT[i + 1], self.theta_model)
+            xn = self.env.model_mpc(self.X[:, i], self.U[:, i + 1], self.theta_model)
 
             # sys inequalities
             hx.append(self.T_DESIRED[i] - self.X[0, i] - self.SIGMA[0, i])  # slack
             hx.append(self.T_MIN[i] - self.X[0, i] - self.SIGMA[1, i])   # slackmin
+            hx.append(10 - self.X[2, i])
+            hx.append(self.X[2, i] - 31)
 
             # slack inequalities
             hsg.append(-self.SIGMA[0, i])
@@ -241,6 +243,8 @@ class Custom_QP_formulation:
         g.append(self.X[:, self.N - 1] - xn)
         hx.append(self.T_DESIRED[self.N - 1] - self.X[0, self.N - 1] - self.SIGMA[0, self.N - 1])
         hx.append(self.T_MIN[self.N - 1] - self.X[0, self.N - 1] - self.SIGMA[1, self.N - 1])
+        hx.append(10 - self.X[2, self.N - 1])
+        hx.append(self.X[2, self.N - 1] - 31)
         hsg.append(-self.SIGMA[0, self.N - 1])
         hsg.append(-self.SIGMA[1, self.N - 1])
 
@@ -308,11 +312,11 @@ class Custom_QP_formulation:
     #     return stage_cost_fn
 
     def spot_cost_fn(self):
-        p_hp_unsat = self.theta_spot * self.env.k * (self.x[2] - self.x[0])
-        alpha = 1 / self.env.relu * (csd.log(1 + csd.exp(self.env.relu * p_hp_unsat)))
-        p_hp = alpha - 1 / self.env.relu * (csd.log(1 + csd.exp(self.env.relu * (alpha - self.env.maxpow))))
+        p_hp = self.theta_spot * self.env.k * self.x[3]
+        # alpha = 1 / self.env.relu * (csd.log(1 + csd.exp(self.env.relu * p_hp_unsat)))
+        # p_hp = alpha - 1 / self.env.relu * (csd.log(1 + csd.exp(self.env.relu * (alpha - self.env.maxpow))))
+        # l_spot = self.env.w_spot * (self.price * p_hp)
         l_spot = self.env.w_spot * (self.price * p_hp)
-        # l_spot = self.env.w_spot * (self.price * p_hp_unsat)
         spot_cost_fn = csd.Function("spot_cost_fn", [self.x, self.theta, self.price], [l_spot])
         return spot_cost_fn
 
@@ -338,7 +342,7 @@ class Custom_MPCActor(Custom_QP_formulation):
         self.debug = debug
 
         self.p_val = np.zeros((self.p_dim, 1))
-        self.actor_wt = 0.01 * np.random.rand(self.theta_dim, 1)
+        self.actor_wt = np.array([0, 0, 0, 1, 1, 1, 1])[:, None]
 
         # Test run
         # _ = self.act_forward(self.env.reset())
@@ -354,16 +358,14 @@ class Custom_MPCActor(Custom_QP_formulation):
         self.p_val[self.obs_dim:self.obs_dim + self.theta_dim, :] = act_wt
 
         self.p_val[self.obs_dim + self.theta_dim:self.obs_dim + self.theta_dim + self.N, :] = \
-            np.reshape(self.env.tout[time:time + self.N], (-1, 1), order='F')
-        self.p_val[self.obs_dim + self.theta_dim + self.N:self.obs_dim + self.theta_dim + 2 * self.N, :] = \
             np.reshape(self.env.price[time:time + self.N], (-1, 1), order='F')
-        self.p_val[self.obs_dim + self.theta_dim + 2 * self.N:self.obs_dim + self.theta_dim + 3 * self.N, :] = \
+        self.p_val[self.obs_dim + self.theta_dim + self.N:self.obs_dim + self.theta_dim + 2 * self.N, :] = \
             np.reshape(self.env.t_desired[time:time + self.N], (-1, 1), order='F')
-        self.p_val[self.obs_dim + self.theta_dim + 3 * self.N:, :] = \
+        self.p_val[self.obs_dim + self.theta_dim + 2 * self.N:, :] = \
             np.reshape(self.env.t_min[time:time + self.N], (-1, 1), order='F')
         # order='F' reshape the matrix by column
 
-        self.X0 = 0.5 * np.ones((self.obs_dim + self.action_dim + self.sigma_dim) * self.N)
+        self.X0 = np.repeat(np.array([0, 20, 14, 20, 0, 0, 0]), self.N)
 
         self.soln = self.vsolver(
             x0=self.X0,
@@ -372,7 +374,7 @@ class Custom_MPCActor(Custom_QP_formulation):
             ubg=self.ubg_vcsd, )
         fl = self.vsolver.stats()
         if not fl["success"]:
-            RuntimeError("Problem is Infeasible")
+            raise RuntimeError("Problem is Infeasible")
 
         opt_var = self.soln["x"].full()
         act = np.array(opt_var[: self.action_dim])[:, 0]
@@ -399,12 +401,10 @@ class Custom_MPCActor(Custom_QP_formulation):
         # recall the time when calculate info
         time = info["time"]
         self.p_val[self.obs_dim + self.theta_dim:self.obs_dim + self.theta_dim + self.N, :] = \
-            np.reshape(self.env.tout[time:time + self.N], (-1, 1), order='F')
-        self.p_val[self.obs_dim + self.theta_dim + self.N:self.obs_dim + self.theta_dim + 2 * self.N, :] = \
             np.reshape(self.env.price[time:time + self.N], (-1, 1), order='F')
-        self.p_val[self.obs_dim + self.theta_dim + 2 * self.N:self.obs_dim + self.theta_dim + 3 * self.N, :] = \
+        self.p_val[self.obs_dim + self.theta_dim + self.N:self.obs_dim + self.theta_dim + 2 * self.N, :] = \
             np.reshape(self.env.t_desired[time:time + self.N], (-1, 1), order='F')
-        self.p_val[self.obs_dim + self.theta_dim + 3 * self.N:, :] = \
+        self.p_val[self.obs_dim + self.theta_dim + 2 * self.N:, :] = \
             np.reshape(self.env.t_min[time:time + self.N], (-1, 1), order='F')
 
         [dRdz, dRdP] = self.dR_sensfunc(z, self.p_val)

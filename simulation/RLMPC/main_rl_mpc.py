@@ -1,8 +1,8 @@
 import json
 import numpy as np
 import os
-from RLMPC.Environments import env_init
-from RLMPC.Agents import agent_init
+from Environments import env_init
+from Agents import agent_init
 from replay_buffer import BasicBuffer
 from helpers import tqdm_context
 from rollout_utils import rollout_sample, train_controller
