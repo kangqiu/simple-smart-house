@@ -192,7 +192,7 @@ def get_temperature_settings(dt, start):
     t_desired = list(f(np.array(timeInterp)))
 
     return t_min, t_desired
-def plot(df_history, start, stop):
+def plot(df_history, start, stop, savefig = False):
     timesteps  = list(df_history.index.values[start:stop])
     fig, (ax1, ax2) = plt.subplots(2)
     ax1.plot(timesteps, df_history['t_desired'].values.tolist()[start:stop], label='t_desired')
@@ -223,9 +223,14 @@ def plot(df_history, start, stop):
     )
     ax3.grid()
 
-    fig.legend(handles, labels, loc='upper center')
+    fig.legend(handles, labels, bbox_to_anchor=(1.05, 1), loc=2, borderaxespad=0.) # loc='upper right')
     plt.tight_layout()
+
     plt.grid("on")
+
+    if savefig == True:
+        filename = cfg.results_file.split('.')[1]
+        fig.savefig('fig.pdf',format="pdf",  bbox_inches='tight')
     plt.show()
     plt.close(fig)
     pass

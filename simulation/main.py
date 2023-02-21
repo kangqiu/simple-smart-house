@@ -41,9 +41,14 @@ def get_simulation_step(history, t_out, t_target, noise_room, noise_power):
     ).full().flatten()[0]
 
     t_room += noise_room
-    power += noise_power * 0.3
-    power = cfg.satpower(power).full().flatten()[0]
 
+    #recalculate power noise
+    power = cfg.power(
+        history['room'],
+        t_target
+    ).full().flatten()[0]  + noise_power * 0.3
+
+    power = cfg.satpower(power).full().flatten()[0]
 
     return t_wall, t_room, power
 
@@ -62,13 +67,15 @@ def main():
     'room': 20.0,
     'wall': 14.3,
     'target': 20,
+    'power': 0,
     'room_noise': 0,
     'power_noise': 0,
     't_min': 17,
-    't_desired': 18
+    't_desired': 18,
 }
     df_history = pd.DataFrame(columns=['room', 'wall', 'power', 'target', 'room_noise', 'power_noise', 't_min',
                                        't_desired', 'spot_price', 't_out'])
+    df_history = pd.concat([df_history, pd.DataFrame(history, index=[0])], ignore_index=True)
 
     noise  = datahandling.generate_noise_trajectories(timesteps)
 

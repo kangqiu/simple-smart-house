@@ -16,34 +16,35 @@ def get_model(w, data):
     lbg = []
     ubg = []
     for k in range(cfg.n_mpc - 1):
+        # COP = cfg.COP(data['t_out', k])
+        COP = cfg.COP
+        # power prediction
         power = cfg.power_mpc(w['state', k, 'room'], w['state', k+1, 't_target'], cfg.thetam_num)
-        satpower = cfg.satpower(power)
         # Power Temperature Dynamics
-        g.append(satpower - w['state', k, 'power'])
+        g.append(power - w['state', k, 'power'])
         lbg.append(0)
         ubg.append(0)
         # COP = cfg.COP(data['t_out', k])
         COP = cfg.COP
         t_wall_plus = cfg.wall_mpc(w['state', k, 'wall'], w['state', k, 'room'], data['t_out', k], cfg.thetam_num)
-        t_room_plus = cfg.room_mpc(w['state', k, 'wall'], w['state', k, 'room'], data['t_out', k], satpower, COP, cfg.thetam_num)
-
+        t_room_plus = cfg.room_mpc(w['state', k, 'wall'], w['state', k, 'room'], data['t_out', k], power, COP,
+                                   cfg.thetam_num)
 
         # Room Temperature Dynamics
-        g.append(t_room_plus - w['state', k+1, 'room'])
+        g.append(t_room_plus - w['state', k + 1, 'room'])
         lbg.append(0)
         ubg.append(0)
 
         # Wall Temperature Dynamics
-        g.append(t_wall_plus - w['state', k+1, 'wall']
-        )
+        g.append(t_wall_plus - w['state', k + 1, 'wall']
+                 )
         lbg.append(0)
         ubg.append(0)
 
         ### Control dynamics ###
-        g.append(w['state', k, 't_target'] + w['input', k, 'dt_target'] - w['state', k+1, 't_target'])
+        g.append(w['state', k, 't_target'] + w['input', k, 'dt_target'] - w['state', k + 1, 't_target'])
         lbg.append(0)
         ubg.append(0)
-
 
         ### Slack stuff ###
         g.append(data['t_desired', k] - w['state', k, 'room'] - w['state', k, 'slack'])
@@ -53,6 +54,8 @@ def get_model(w, data):
         g.append(data['t_min', k] - w['state', k, 'room'] - w['state', k, 'slackmin'])
         lbg.append(-inf)
         ubg.append(0)
+
+
 
     return g, lbg, ubg
 
@@ -66,6 +69,8 @@ def get_objective(w, data):
     w_tabove = 0.001  # weight temperature above
     w_tmin = 10
     w_target = 0.5
+
+
     for k in range(cfg.n_mpc - 1):
         J += cfg.lmpc_func(data['t_desired', k] , w['state', k, 'room'], w['state', k, 'slack'],
                            w['state', k, 'slackmin'] , w['input', k, 'dt_target'], w['state', k, 'power'],
@@ -77,7 +82,7 @@ def get_objective(w, data):
             # # J += (w_target * w['input', k, 'dt_target'] ** 2 / float(cfg.n_mpc))
             # J += (w_spot * (data['spot', k] * w['state', k, 'power']) / float(cfg.n_mpc))
     # terminal cost
-    J += cfg.tmpc_func(w['state', -1, 'slack'], w['state', -1, 'slackmin'], cfg.thetat_num)
+    J += cfg.tmpc_func(w['state', -1, 'slack'], w['state', -1, 'slackmin'], cfg.thetal_num)
     # J += (w_tbelow * w['state', -1, 'slack'] ** 2 / float(cfg.n_mpc))
     # J += (w_tmin * w['state', -1, 'slackmin'] ** 2 / float(cfg.n_mpc))
 
@@ -144,6 +149,9 @@ def set_initial_conditions(state0, lbw, ubw):
 
     lbw['state', 0, 't_target'] = state0['target']
     ubw['state', 0, 't_target'] = state0['target']
+    #
+    # lbw['state', 0, 'power'] = state0['power']
+    # ubw['state', 0, 'power'] = state0['power']
     return lbw, ubw
 
 def get_step(w, lbg, ubg, data, state0, solverMPC, spot, out_temp, t_min, t_desired):
@@ -172,6 +180,10 @@ def get_step(w, lbg, ubg, data, state0, solverMPC, spot, out_temp, t_min, t_desi
     sol = solverMPC(
         x0=w0, lbx=lbw, ubx=ubw, lbg=lbg, ubg=ubg, p=datanum
     )
+
+    # fl = solverMPC.stats()
+    # if not fl["success"]:
+    #     raise RuntimeError("Solver infeasible")
     w_opt = sol["x"].full().flatten()
 
     w_opt = w(w_opt)

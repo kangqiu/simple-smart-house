@@ -4,7 +4,7 @@ import pytz
 import datetime as dt
 import numpy as np
 
-
+#take actuation penalty out!
 ################################################################################################
 # file imports
 import datahandling
@@ -15,30 +15,40 @@ n_rl = 24 * 12 #24h
 n_batches = 31 #days
 len_batches = 288*5 #2 days length batchsize
 #results are saved in this file
-results_file = '../results/simulation_january_v3.pkl'
+results_file = '../results/Sanity_checks/01_all_noise_basecase.pkl'
 
 gamma = 1
-episodes = 100
+episodes = 3
 
 #stepsize of Q-update
-alphal = 2e-6
-alpham = 2e-6
-alphat = 2e-6
+# alphal = np.array([0, 1e-3, 1e-3, 1e-3, 1e-3, 1e-3])
+# alpham = 1e-15
+# alphat = 1e-15
 
 constrained_update = False
 
+use_ipopt = True
+
 ################################################################################################
 # declaring parametrization
-thetal = MX.sym('thetal', 6)
-thetat = MX.sym('thetat', 3)
-thetam = MX.sym('theta_m', 10)
+thetal = MX.sym('thetal', 8)
+thetam = MX.sym('theta_m', 9)
 
-thetal_num = np.array([0.0, 1.0, 1.0, 1.0, 1.0, 1.0])
-thetat_num = np.array([1.0, 1.0, 0.0])
-thetam_num = np.array([1.0, 1.0, 0.0, 1.0, 1.0, 0.0, 1.0, 1.0, 1.0, 0.0])
+# l_mpc = 0
+# l_mpc += thetal[0]
+# l_mpc += (thetal[1] * w_tabove * (t_desired- t_room)**2 / float(n_mpc))
+# l_mpc += (thetal[2] * w_tbelow * fmax((t_room - t_desired), 0) ** 2 / float(n_mpc))
+# l_mpc += (thetal[3] * w_tmin * fmax((t_min - t_room),0) ** 2 / float(n_mpc))
+# # l_mpc += (w_tset * (hubber ** 2) * (sqrt(1 + (dt_set / hubber) ** 2) - 1) / float(n_mpc))
+# l_mpc += (thetal[4] * w_spot * (spot * power_HP) / float(n_mpc))
+
+# thetal_num = np.array([0.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 0.0])
+thetal_num = np.array([1.65308884e-03, 5.54200886e+00, 5.43461281e-01, 9.99916404e+04,
+ 1.02363722e+00, 5.64503685e+00, 9.99916404e+04, 4.74511523e-01])
+thetam_num = np.array([1.0, 0.0, 1.0, 1.0, 0.0, 1.0, 1.0, 1.0, 0.0])
 
 # setting lower bound for parameter updates
-thetal_lb = np.array([0, 0.001, 0.001, 0.001])
+# thetal_lb = np.array([0, 0.001, 0.001, 0.001])
 
 
 ################################################################################################
@@ -89,18 +99,21 @@ rho_dir_room = rho_dir/m_air
 
 #parameterized model equations MPC
 
-pow_mpc = thetam[0] * HPset * thetam[1]* t_set - HPin * t_room + HP0 +thetam[2]
-power_mpc = Function('power_mpc', [t_room, t_set, thetam], [pow_mpc])
+# pow_mpc = thetam[0] * HPset * thetam[1]* t_set - HPin * t_room + HP0 +thetam[2]
+k = 0.2
+pow = thetam[0]* k * (t_set - t_room) + thetam[1]
+# new saturation function
+alpha = 0.1
+powsat = 0.5 * (pow + maxpow - sqrt((pow - maxpow)**2 + alpha))
+hppow = 0.5 * (powsat + sqrt(powsat ** 2 + alpha))
+power_mpc = Function('power_mpc', [t_room, t_set, thetam], [hppow])
 
-powsat = log(1 + exp(ReLu * unsatpower)) / ReLu
-hppow = powsat - log(1 + exp(ReLu * (powsat - maxpow))) / ReLu
-satpower_mpc = Function('satpower_mpc', [unsatpower], [hppow])
 
-t_wall_mpc = t_wall + thetam[3] * rho_out_wall * (t_out - t_wall) + thetam[4] * rho_in_wall * (t_room - t_wall) + thetam[5]
+t_wall_mpc = t_wall + thetam[2] * rho_out_wall * (t_out - t_wall) + thetam[3] * rho_in_wall * (t_room - t_wall) + thetam[4]
 wall_mpc = Function('wall_mpc', [t_wall, t_room, t_out, thetam], [t_wall_mpc])
 
-t_room_mpc = t_room + thetam[6]*rho_in_room * (t_wall - t_room) + thetam[7] * rho_dir_room * (t_out - t_room) + thetam[8] *\
-             COP * power_HP * 1/m_air + thetam[9]
+t_room_mpc = t_room + thetam[5]*rho_in_room * (t_wall - t_room) + thetam[6] * rho_dir_room * (t_out - t_room) + thetam[7] *\
+             COP * power_HP * 1/m_air + thetam[8]
 
 room_mpc = Function('room_mpc', [t_wall, t_room, t_out, power_HP, thetam], [t_room_mpc])
 
@@ -119,7 +132,7 @@ lmeas = 0
 lmeas += w_tabove * (t_desired - t_room_meas) ** 2 / n_rl
 lmeas += w_tbelow * fmax((t_room_meas - t_desired), 0) ** 2 / n_rl
 lmeas += w_tmin * fmax((t_min - t_room_meas), 0)** 2 / n_rl
-lmeas += w_tset * (hubber ** 2) * (sqrt(1 + (dt_set/ hubber) ** 2) - 1) / n_rl
+# lmeas += w_tset * (hubber ** 2) * (sqrt(1 + (dt_set/ hubber) ** 2) - 1) / n_rl
 lmeas += w_spot * spot * power_HP_meas / n_rl
 lmeas_func = Function(
     'lmeas_func', [t_desired, t_room_meas, t_min, dt_set, power_HP_meas, spot], [lmeas])
@@ -130,16 +143,19 @@ l_mpc += thetal[0]
 l_mpc += (thetal[1] * w_tabove * (t_desired- t_room)**2 / float(n_mpc))
 l_mpc += (thetal[2] * w_tbelow * fmax((t_room - t_desired), 0) ** 2 / float(n_mpc))
 l_mpc += (thetal[3] * w_tmin * fmax((t_min - t_room),0) ** 2 / float(n_mpc))
-l_mpc += (thetal[4] * w_tset * (hubber ** 2) * (sqrt(1 + (dt_set / hubber) ** 2) - 1) / float(n_mpc))
-l_mpc += (thetal[5] * w_spot * (spot * power_HP) / float(n_mpc))
+# l_mpc += (w_tset * (hubber ** 2) * (sqrt(1 + (dt_set / hubber) ** 2) - 1) / float(n_mpc))
+l_mpc += (thetal[4] * w_spot * (spot * power_HP) / float(n_mpc))
 
 lmpc_func = Function(
     'lmpc_func', [t_desired, t_min, t_room, dt_set, power_HP, spot, thetal], [l_mpc])
 
 t_mpc = 0
-t_mpc += (thetat[0] * w_tbelow * fmax((t_room - t_desired), 0) ** 2 / float(n_mpc))
-t_mpc += (thetat[1] * w_tmin *  fmax((t_min - t_room),0) ** 2 / float(n_mpc))
-t_mpc += thetat[2]
+# t_mpc += (thetal[6] * w_tbelow * fmax((t_room - t_desired), 0) ** 2 / float(n_mpc))
+# t_mpc += (thetal[7] * w_tmin * fmax((t_min - t_room),0) ** 2 / float(n_mpc))
+t_mpc += (thetal[5] * w_tbelow * fmax((t_room - t_desired), 0) ** 2 / float(n_mpc))
+t_mpc += (thetal[6] * w_tmin * fmax((t_min - t_room),0) ** 2 / float(n_mpc))
+t_mpc += thetal[7]
 
-tmpc_func = Function( 'tmpc_func', [t_room, t_desired, t_min, thetat], [t_mpc])
+# tmpc_func = Function( 'tmpc_func', [t_room, t_desired, t_min, thetal], [t_mpc])
+tmpc_func = Function( 'tmpc_func', [t_room, t_desired, t_min], [t_mpc])
 
