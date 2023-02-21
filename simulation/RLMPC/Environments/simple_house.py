@@ -223,15 +223,15 @@ class SimpleHouse(Env):
 
         # Wall and Room Temperature
         t_room_next = 1 / self.m_air * (self.m_air * t_room
-                                        + self.rho_in * (t_wall - t_room)
-                                        + self.rho_dir * (t_out - t_room)
-                                        + self.COP * p_hp) + theta_model[0]
+                                        + theta_model[0] * self.rho_in * (t_wall - t_room)
+                                        + theta_model[1] * self.rho_dir * (t_out - t_room)
+                                        + theta_model[2] * self.COP * p_hp) + theta_model[3]
 
         t_wall_next = 1 / self.m_wall * (self.m_wall * t_wall
-                                         + self.rho_out * (t_out - t_wall)
-                                         + self.rho_in * (t_room - t_wall)) + theta_model[1]
+                                         + theta_model[4] * self.rho_out * (t_out - t_wall)
+                                         + theta_model[5] * self.rho_in * (t_room - t_wall)) + theta_model[6]
         t_set_next = t_set + delta_tset
-        p_hp_unsat = self.k * (t_set_next - t_room_next)
+        p_hp_unsat = theta_model[7] * self.k * (t_set_next - t_room_next) + theta_model[8]
         p_hp_unsat_max = 1 / 2 * (p_hp_unsat + 1.5 - csd.sqrt((p_hp_unsat - 1.5) ** 2 + 0.1))
         p_hp_next = 1 / 2 * (p_hp_unsat_max + 0 + csd.sqrt((p_hp_unsat_max - 0) ** 2 + 0.1))
 

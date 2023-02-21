@@ -171,12 +171,12 @@ class Custom_QP_formulation:
         # dt target temperature dimension = N
         self.t_min = csd.MX.sym('t_min')
         self.T_MIN = csd.MX.sym('T_MIN', self.N)
-        # theta dimension = 7
-        self.theta_model = csd.MX.sym("theta_model", 3)
-        self.theta_temp = csd.MX.sym("theta_temp")
-        self.theta_spot = csd.MX.sym("theta_spot")
-        self.theta_act = csd.MX.sym("theta_act")
-        self.theta_term = csd.MX.sym("theta_term")
+        # theta dimension = 8 + 9
+        self.theta_model = csd.MX.sym("theta_model", 9)
+        self.theta_temp = csd.MX.sym("theta_temp", 3)
+        self.theta_spot = csd.MX.sym("theta_spot", 1)
+        self.theta_act = csd.MX.sym("theta_act", 1)
+        self.theta_term = csd.MX.sym("theta_term", 3)
         self.theta = csd.vertcat(self.theta_model, self.theta_temp, self.theta_spot, self.theta_act, self.theta_term)
         self.theta_dim = self.theta.size()[0]
 
@@ -214,11 +214,13 @@ class Custom_QP_formulation:
 
         # initial model
         xn = self.env.model_mpc(self.x, self.U[:, 0], self.theta_model)
-        J += self.gamma ** 0 * (self.spot_cost(self.x, self.theta, self.PRICE[0]) + self.act_cost(self.U[:, 0], self.theta))
+        J += self.gamma ** 0 * (self.spot_cost(self.x, self.theta, self.PRICE[0]) + self.act_cost(self.U[:, 0]))
 
         for i in range(self.N - 1):
-            J += self.gamma ** i * (self.temp_cost(self.X[:, i], self.theta, self.T_DESIRED[i]) + W @ (self.SIGMA[:, i] * self.SIGMA[:, i])) \
-                 + self.gamma ** (i + 1) * (self.act_cost(self.U[:, i + 1], self.theta) + self.spot_cost(self.X[:, i], self.theta, self.PRICE[i + 1]))
+            J += self.gamma ** i * (self.temp_cost(self.X[:, i], self.theta, self.T_DESIRED[i])
+                                    + W @ (self.SIGMA[:, i] * self.SIGMA[:, i] * csd.vertcat(self.theta_temp[1], self.theta_temp[2]))) \
+                 + self.gamma ** (i + 1) * (self.act_cost(self.U[:, i + 1]) + self.spot_cost(self.X[:, i], self.theta, self.PRICE[i + 1])) \
+                 + self.theta_act
 
             # model equality
             g.append(self.X[:, i] - xn)
@@ -238,7 +240,7 @@ class Custom_QP_formulation:
             # xxxxxxxxxxxxxxxxxxxxxx
 
         J += self.gamma ** (self.N - 1) * (self.terminal_cost(self.X[:, self.N - 1], self.theta, self.T_DESIRED[self.N - 1])
-                                           + W @ (self.SIGMA[:, self.N - 1] * self.SIGMA[:, self.N - 1]))
+                                           + W @ (self.SIGMA[:, self.N - 1] * self.SIGMA[:, self.N - 1] * csd.vertcat(self.theta_term[1], self.theta_term[2])))
 
         g.append(self.X[:, self.N - 1] - xn)
         hx.append(self.T_DESIRED[self.N - 1] - self.X[0, self.N - 1] - self.SIGMA[0, self.N - 1])
@@ -312,26 +314,26 @@ class Custom_QP_formulation:
     #     return stage_cost_fn
 
     def spot_cost_fn(self):
-        p_hp = self.theta_spot * self.env.k * self.x[3]
+        p_hp = self.x[3]
         # alpha = 1 / self.env.relu * (csd.log(1 + csd.exp(self.env.relu * p_hp_unsat)))
         # p_hp = alpha - 1 / self.env.relu * (csd.log(1 + csd.exp(self.env.relu * (alpha - self.env.maxpow))))
         # l_spot = self.env.w_spot * (self.price * p_hp)
-        l_spot = self.env.w_spot * (self.price * p_hp)
+        l_spot = self.theta_spot * self.env.w_spot * (self.price * p_hp)
         spot_cost_fn = csd.Function("spot_cost_fn", [self.x, self.theta, self.price], [l_spot])
         return spot_cost_fn
 
     def act_cost_fn(self):
-        l_act = self.theta_act * self.env.hubber ** 2 * (csd.sqrt(1 + (self.u / self.env.hubber) ** 2) - 1)
-        act_cost_fn = csd.Function("act_cost_fn", [self.u, self.theta], [l_act])
+        l_act = self.env.w_target * self.env.hubber ** 2 * (csd.sqrt(1 + (self.u / self.env.hubber) ** 2) - 1)
+        act_cost_fn = csd.Function("act_cost_fn", [self.u], [l_act])
         return act_cost_fn
 
     def temp_cost_fn(self):
-        l_temp = self.theta_temp * self.env.w_tabove * (self.t_desired - self.x[0]) ** 2
+        l_temp = self.theta_temp[0] * self.env.w_tabove * (self.t_desired - self.x[0]) ** 2
         temp_cost_fn = csd.Function("temp_cost_fn", [self.x, self.theta, self.t_desired], [l_temp])
         return temp_cost_fn
 
     def terminal_cost_fn(self):
-        terminal_cost = self.theta_term * self.env.w_tabove * (self.t_desired - self.x[0]) ** 2
+        terminal_cost = self.theta_term[0] * self.env.w_tabove * (self.t_desired - self.x[0]) ** 2
         terminal_cost_fn = csd.Function("stage_cost_fn", [self.x, self.theta, self.t_desired], [terminal_cost])
         return terminal_cost_fn
 
@@ -342,7 +344,8 @@ class Custom_MPCActor(Custom_QP_formulation):
         self.debug = debug
 
         self.p_val = np.zeros((self.p_dim, 1))
-        self.actor_wt = np.array([0, 0, 0, 1, 1, 1, 1])[:, None]
+        self.actor_wt = np.array([1, 1, 1, 0, 1, 1, 0, 1, 0,
+                                  1, 1, 1, 1, 0, 1, 1, 1])[:, None]
 
         # Test run
         # _ = self.act_forward(self.env.reset())
