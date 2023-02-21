@@ -7,7 +7,7 @@ from replay_buffer import BasicBuffer
 from helpers import tqdm_context
 from rollout_utils import rollout_sample, train_controller
 
-json_path = os.path.abspath(os.path.join(os.getcwd(), 'RLMPC/Settings/rl_mpc_lstd.json'))
+json_path = os.path.abspath(os.path.join(os.getcwd(), 'Settings/rl_mpc_lstd.json'))
 with open(json_path, 'r') as f:
     params = json.load(f)
     params["env_params"]["json_path"] = json_path

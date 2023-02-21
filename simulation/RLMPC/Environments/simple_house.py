@@ -197,7 +197,7 @@ class SimpleHouse(Env):
 
         t_set_next = t_set + delta_tset
 
-        p_hp_unsat = self.k * (t_set_next - t_room_next)
+        p_hp_unsat = self.k * (t_set_next - t_room_next) + 0.3 * noise_hp
         p_hp_unsat_max = 1 / 2 * (p_hp_unsat + 1.5 - csd.sqrt((p_hp_unsat - 1.5) ** 2 + 0.1))
         p_hp_next = 1 / 2 * (p_hp_unsat_max + 0 + csd.sqrt((p_hp_unsat_max - 0) ** 2 + 0.1))
 
