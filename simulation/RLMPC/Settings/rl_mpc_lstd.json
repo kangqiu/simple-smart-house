@@ -1,15 +1,15 @@
 {
     "env": "simple_house",
     "env_params": {
-        "start": [2022, 1, 1, 0, 0],
-        "stop": [2022, 2, 2, 0, 0],
+        "start": [2022, 9, 1, 0, 0],
+        "stop": [2022, 9, 9, 0, 0],
         "dt": 5,
         "MPC_Horizon": 288,
         "epsilon_hp": 0,
         "epsilon_temp": 0,
         "t_out": -5,
         "spot": "../../data/SpotData2022_Trheim.pkl",
-        "noise": "../../data/noise/01_training_january.pkl"
+        "noise": "../../data/noise/01_september_week_train.pkl"
     },
 
     "agent": "RLMPC_LSTDQ",
