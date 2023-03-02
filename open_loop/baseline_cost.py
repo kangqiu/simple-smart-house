@@ -1,4 +1,3 @@
-# package imports
 from casadi.tools import *
 import pytz
 import datetime as dt

@@ -11,11 +11,11 @@ import numpy as np
 Tax  = 1.25
 
 local_timezone=pytz.timezone('Europe/Oslo')
-# Zone = 'Tr.heim'
-Zone = 'Oslo'
+Zone = 'Tr.heim'
+# Zone = 'Oslo'
 Now  = datetime.now(tz=local_timezone)
 
-Year = 2022
+Year = 2023
 # ZoneData = 'Trheim'
 ZoneData = 'Oslo'
 filename = 'SpotData'+str(Year)+'_'+ZoneData+'.pkl'

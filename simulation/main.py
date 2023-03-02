@@ -8,6 +8,7 @@ main file for simple smart house mpc example
 from casadi.tools import *
 import pandas as pd
 import pickle as pkl
+from tqdm import tqdm
 
 ################################################################################################
 # file imports
@@ -25,8 +26,7 @@ def get_simulation_step(history, t_out, t_target, noise_room, noise_power):
     power = cfg.power(
         history['room'],
         t_target
-    ).full().flatten()[0] # + noise_power * 0.3
-
+    ).full().flatten()[0]
     power = cfg.satpower(power).full().flatten()[0]
 
     t_wall = cfg.wallplus(
@@ -40,31 +40,31 @@ def get_simulation_step(history, t_out, t_target, noise_room, noise_power):
         power, COP
     ).full().flatten()[0]
 
-    t_room += noise_room
-
-    #recalculate power noise
+    # recalculate noisy power
     power = cfg.power(
         history['room'],
         t_target
-    ).full().flatten()[0]  + noise_power * 0.3
+    ).full().flatten()[0] + noise_power
 
     power = cfg.satpower(power).full().flatten()[0]
 
+    t_room += noise_room
     return t_wall, t_room, power
 
 def main():
+    print(cfg.results_file)
+    print(cfg.thetal)
     timesteps, timesteps_N, dt, dt_N = datahandling.get_time()
-
     # get outdoor temperature of the month
     # get spot pricing of the month
     spot = datahandling.get_spot_data(timesteps_N[0], timesteps_N[-1], dt_N)
     out_temp = datahandling.get_outside_temperature(timesteps_N[0], timesteps_N[-1], dt_N)
     # get minimum and desired temperature references
-    t_min, t_desired = datahandling.get_temperature_settings(dt_N, cfg.start)
+    t_min, t_max, t_mid = datahandling.get_temperature_settings(dt_N, cfg.start)
 
     # initialize history
     history = {
-    'room': 20.0,
+    'room': 17,
     'wall': 14.3,
     'target': 20,
     'power': 0,
@@ -74,40 +74,61 @@ def main():
     't_desired': 18,
 }
     df_history = pd.DataFrame(columns=['room', 'wall', 'power', 'target', 'room_noise', 'power_noise', 't_min',
-                                       't_desired', 'spot_price', 't_out'])
-    df_history = pd.concat([df_history, pd.DataFrame(history, index=[0])], ignore_index=True)
-
+                                       't_max', 't_mid', 'spot_price', 't_out'])
     noise  = datahandling.generate_noise_trajectories(timesteps)
 
     w, data, solverMPC, lbg, ubg = mpc.instantiate()
 
-    for ts in range(len(timesteps)):
-        print(f"Timestep {ts}/ {len(timesteps)}")
+    for ts, index in enumerate(tqdm(range(len(timesteps)))):
+    # for ts in range(len(timesteps)):
+        # print(f"Timestep {ts}/ {len(timesteps)}")
         spot_forecast = spot[ts:ts+cfg.n_mpc]
         out_temp_forecast = out_temp[ts:ts+cfg.n_mpc]
         t_min_reference = t_min[ts:ts+cfg.n_mpc]
-        t_desired_reference = t_desired[ts:ts + cfg.n_mpc]
-        t_target = mpc.get_step(w, lbg, ubg, data, history, solverMPC, spot_forecast, out_temp_forecast, t_min_reference, t_desired_reference)
-        # t_target = 25
-        t_wall, t_room, power = get_simulation_step(history, out_temp[ts], t_target, noise['room'][ts], noise['power'][ts])
+        t_mid_reference = t_mid[ts:ts + cfg.n_mpc]
+        t_max_reference = t_max[ts:ts + cfg.n_mpc]
+        t_target = mpc.get_step(w, lbg, ubg, data, history, solverMPC, spot_forecast, out_temp_forecast, t_min_reference,
+                                t_mid_reference, t_max_reference)
+        t_wall, t_room, power = get_simulation_step(history, out_temp[ts], np.round(t_target), noise['room'][ts], noise['power'][ts])
 
-        #append to history
-        history['room'] = t_room
-        history['wall'] = t_wall
+        #append same step power simulation to datafrema
         history['power'] = power
         history['target'] = t_target
-        history['room_noise'] = noise['room'][ts]
-        history['power_noise'] = noise['power'][ts]
         history['t_min'] = t_min[ts]
-        history['t_desired'] = t_desired[ts]
+        history['t_mid'] = t_mid[ts]
+        history['t_max'] = t_max[ts]
         history['spot_price'] = spot[ts]
         history['t_out'] = out_temp[ts]
 
         df_history = pd.concat([df_history, pd.DataFrame(history, index=[0])], ignore_index=True)
-    
+
+        #append to history state predictions
+        history['room'] = t_room
+        history['wall'] = t_wall
+        history['room_noise'] = noise['room'][ts]
+        history['power_noise'] = noise['power'][ts]
+
+
+    # append last timestep to dataframe
+    history['power'] = 0
+    history['target'] = 0
+    history['t_min'] = t_min[ts+1]
+    history['t_mid'] = t_mid[ts+1]
+    history['t_max'] = t_max[ts+1]
+    history['spot_price'] = spot[ts+1]
+    history['t_out'] = out_temp[ts+1]
+
+    df_history = pd.concat([df_history, pd.DataFrame(history, index=[0])], ignore_index=True)
+
     # some rudimentary plotting features
     datahandling.plot(df_history, 0, len(timesteps))
     print("Save results")
+
+    # results = {
+    #     'history': df_history,
+    #     'theta': cfg.thetal
+    # }
+    #
     f = open(cfg.results_file, "wb")
     pkl.dump(df_history, f, protocol=2)
     f.close()

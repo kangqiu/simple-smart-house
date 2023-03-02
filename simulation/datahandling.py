@@ -93,8 +93,10 @@ def get_spot_data(start, stop, dt_N):
     data = data.rename(columns={"Time_start": "time", "Price": "prices"})
 
     prices = data.to_dict(orient="list")
-
+    # p =[15] * 3 +[200] *int(len(data['prices'])-3)
+    # prices['prices'] = p
     prices = interpolate_spot_data(prices, start, dt_N)
+
 
     return prices
 
@@ -150,8 +152,13 @@ def generate_noise_trajectories(timesteps):
             power_noise = [0]
             room_noise = [0]
             for ts in range(len(timesteps)):
-                power_noise.append(cfg.noise['beta']['power'] * power_noise[-1] + np.random.normal(cfg.noise['mu']['power'], cfg.noise['epsilon']['power'] * cfg.noise['sig']['power']))
+                # power_noise.append(np.random.normal(0, 0.15))
+                power_noise.append(0.3* (cfg.noise['beta']['power'] * power_noise[-1] + np.random.normal(cfg.noise['mu']['power'], cfg.noise['epsilon']['power'] * cfg.noise['sig']['power'])))
                 room_noise.append(cfg.noise['beta']['room'] * room_noise[-1] + np.random.normal(cfg.noise['mu']['room'], cfg.noise['epsilon']['room'] * cfg.noise['sig']['room']))
+            plt.plot(range(len(room_noise)), room_noise)
+            plt.show()
+            plt.plot(range(len(power_noise)), power_noise)
+            plt.show()
             #save noise in file 
             noise = {'power': power_noise[1::], 'room': room_noise[1::]}
             with open(cfg.noise_file, 'wb') as handle:
@@ -171,8 +178,9 @@ def generate_noise_trajectories(timesteps):
 def get_temperature_settings(dt, start):
     times = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24]
     min_temps = [17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17]
-    desired_temps = [18, 18, 18, 18, 18, 19, 21.5, 21.5, 21.5, 21.5, 21.5, 21.5, 21.5, 21.5, 21.5, 21.5, 21.5, 21.5, 21.5, 21.5, 21.5, 21.5, 21.5, 20, 19]
-
+    max_temps = [18, 18, 18, 18, 18, 19, 21.5, 21.5, 21.5, 21.5, 21.5, 21.5, 21.5, 21.5, 21.5, 21.5, 21.5, 21.5, 21.5, 21.5, 21.5, 21.5, 21.5, 20, 19]
+    mid_temps = [17.5, 17.5, 17.5, 17.5, 17.5, 18, 19.25, 19.25, 19.25, 19.25, 19.25, 19.25, 19.25, 19.25, 19.25, 19.25,
+                 19.25, 19.25, 19.25, 19.25, 19.25, 19.25, 19.25, 18.5, 18]
     # interpolate temperature references
     timeInterp = []
     for k in range(len(dt)):
@@ -187,18 +195,27 @@ def get_temperature_settings(dt, start):
 
     f = scinterp.interp1d(
         np.array(times),
-        np.array(desired_temps),
+        np.array(max_temps),
         kind="nearest")
-    t_desired = list(f(np.array(timeInterp)))
+    t_max = list(f(np.array(timeInterp)))
 
-    return t_min, t_desired
+    f = scinterp.interp1d(
+        np.array(times),
+        np.array(mid_temps),
+        kind="nearest")
+    t_mid = list(f(np.array(timeInterp)))
+
+    return t_min, t_max, t_mid
 def plot(df_history, start, stop, savefig = False):
+    target_continuous = df_history['target'].values.tolist()
+    target = [np.round(t) for t in target_continuous]
     timesteps  = list(df_history.index.values[start:stop])
     fig, (ax1, ax2) = plt.subplots(2)
-    ax1.plot(timesteps, df_history['t_desired'].values.tolist()[start:stop], label='t_desired')
+    ax1.plot(timesteps, df_history['t_max'].values.tolist()[start:stop], label='t_max')
+    # ax1.plot(timesteps, df_history['t_mid'].values.tolist()[start:stop], label='t_mid')
     ax1.plot(timesteps, df_history['t_min'].values.tolist()[start:stop], label='t_min')
     ax1.plot(timesteps, df_history['room'].values.tolist()[start:stop], label='t_room')
-    ax1.plot(timesteps, df_history['target'].values.tolist()[start:stop], label="t_set")
+    # ax1.plot(timesteps, target[start:stop], label="t_set")
     ax1.set_xticklabels([])
     ax1.tick_params( axis="x", 
                 labelrotation=45,  # changes apply to the x-axis
@@ -223,7 +240,8 @@ def plot(df_history, start, stop, savefig = False):
     )
     ax3.grid()
 
-    fig.legend(handles, labels, bbox_to_anchor=(1.05, 1), loc=2, borderaxespad=0.) # loc='upper right')
+    # fig.legend(handles, labels, bbox_to_anchor=(1.05, 1), loc=2, borderaxespad=0.) # loc='upper right')
+    fig.legend(handles, labels)
     plt.tight_layout()
 
     plt.grid("on")

@@ -4,6 +4,7 @@ __pycache__/
 *$py.class
 
 /results
+/open_loop/results
 
 # Jupyter Notebook
 .ipynb_checkpoints
