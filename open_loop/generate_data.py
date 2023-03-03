@@ -20,6 +20,7 @@ import pytz
 import datetime
 from dateutil.relativedelta import relativedelta
 import scipy.interpolate as scinterp
+import formulation as form
 ################################################################################################
 # file imports
 currentdir = os.path.dirname(os.path.realpath(__file__))
@@ -45,29 +46,25 @@ def get_time(start, stop):
 
 
 def generate_noise_trajectories(length):
-    params = {'mu': {'room': 0, 'power': 0.033},
-              'sig': {'room': 0.00532, 'power': 0.297},
-              'beta': {'room': 0.96, 'power': 0.92},
-              'epsilon': {'room': 0.75, 'power': 0.68},
-              }
-    """ generates noise trajectory """
-    # check if the noise file exists
     power_noise = [0]
     room_noise = [0]
     for ts in range(length):
         # power_noise.append(np.random.normal(0, 0.15))
         power_noise.append(
             0.3 * (
-                    params['beta']['power'] * power_noise[-1]
-                    + np.random.normal(params['mu']['power'],
-                    params['epsilon']['power'] *
-                    params['sig']['power'])))
+                    form.noise['beta']['power'] * power_noise[-1]
+                    + np.random.normal(form.noise['mu']['power'],
+                    form.noise['epsilon']['power'] *
+                    form.noise['sig']['power'])))
         # room_noise.append(np.random.normal(0, 0.9))
-        room_noise.append(params['beta']['room']
+        room_noise.append(form.noise['beta']['room']
                           * room_noise[-1]
-                          + np.random.normal(params['mu']['room'],
-                           params['epsilon']['room'] *
-                           params['sig']['room']))
+                          + np.random.normal(form.noise['mu']['room'],
+                           form.noise['epsilon']['room'] *
+                           form.noise['sig']['room']))
+
+        # power_noise.append(0)
+        # room_noise.append(0)
 
     noise = {
         'room' : room_noise,
@@ -76,40 +73,22 @@ def generate_noise_trajectories(length):
     return noise
 
 def get_simulation_step(history, t_out, t_target, noise_room, noise_power):
-    #cacolculate non noisy power
-    # COP = cfg.COP(t_out)
-    alpha = 0.1
-    maxpow = 1.5
-    k = 0.2
-    power = k * (t_target - history['room'])
-    a = 0.5 * (power + maxpow - sqrt((power - maxpow) ** 2 + alpha))
-    power = 0.5 * (a + sqrt(a ** 2 + alpha))
+    #non noisy power calculations
+    power = form.power_func(history['room'], t_target)
+    power = form.satpower_func(power)
 
-    # temperature prediction model
-    m_air = 31.03
-    m_wall = 67.22
-    rho_in = 0.36
-    rho_out = 0.033
-    rho_dir = 0.033
-
-    COP = 3
-    wall = (1 / m_wall) * (m_wall * history['wall']
-                + rho_out * (t_out - history['wall']) + rho_in *
-                            (history['room'] - history['wall']))
-
-    room = (1 / m_air) * (m_air * history['room']
-                + rho_in * (history['wall'] - history['room'])
-                + rho_dir * (t_out - history['room'])
-                + COP * power)
+    wall = form.wall_func(history['wall'], history['room'], t_out)
+    room = form.room_func(history['wall'], history['room'], t_out, power)
 
     room += noise_room
 
     #recalculate noisy power
-    power = k * (t_target - history['room']) + noise_power
-    a = 0.5 * (power + maxpow - sqrt((power - maxpow) ** 2 + alpha))
-    power = 0.5 * (a + sqrt(a ** 2 + alpha))
+    power = form.power_func(history['room'], t_target)+ noise_power
+    power = form.satpower_func(power)
 
-    return wall, room, power
+    return (wall.full().flatten()[0],
+            room.full().flatten()[0],
+            power.full().flatten()[0])
 
 def interpolate_spot_data(spot, start, dt):
     times = {}
@@ -136,7 +115,7 @@ def interpolate_spot_data(spot, start, dt):
 
 def generate_spot_market(start, stop, dt):
     spot_data = pkl.load(
-            open('../data/SpotData2022_Trheim.pkl', 'rb')
+            open('./data/SpotData2022_Trheim.pkl', 'rb')
         )
     data = pd.DataFrame.from_dict(spot_data)
 
@@ -153,11 +132,6 @@ def generate_spot_market(start, stop, dt):
 
 
 def generate_action_sequence(length):
-    #x = np.arange(start, int(np.round(stop/2)), 1)
-    # x = np.arange(start, stop, 1)
-    # a = np.sin(2 * np.pi * x/(288*4)) *10.5  + 20.5
-    #
-    # a = list(a)
 
     actions = []
     for i in range(length):
@@ -175,7 +149,7 @@ def generate_outtemp_trajectory(start, stop, dt):
     start = start - relativedelta(years=1)
     stop = stop - relativedelta(years=1)
     met_data = pkl.load(
-            open(os.path.join('../data/SEKLIMAData_2021.pkl'), 'rb')
+            open(os.path.join('./data/SEKLIMAData_2021.pkl'), 'rb')
         )
     seklima = pd.DataFrame.from_dict(met_data)
 
@@ -250,15 +224,16 @@ def plot(df_history, start, stop):
 
 ########################################################################################################################
 
-results_file = './results/derandomizev2_run1.pkl'
+results_file = './results/03_openloop_week_test.pkl'
+print(results_file)
 # noise_file = './noise/noise.pkl'# 1 month simulation time frame
 start = datetime.datetime(2022, 9, 1, 0, 0).astimezone(pytz.timezone('Europe/Oslo'))
-stop = datetime.datetime(2022, 10, 2, 0, 0).astimezone(pytz.timezone('Europe/Oslo'))
+stop = datetime.datetime(2022, 9, 8, 0, 0).astimezone(pytz.timezone('Europe/Oslo'))
 
 n_mpc = 288  # 24-hour prediction window
 timesteps, dt = get_time(start, stop)
 
-n_sim = 30000# outside temperature set, but can vary
+n_sim = 3000# outside temperature set, but can vary
 
 history_runs = {}
 outdoor_temperature = generate_outtemp_trajectory(start, stop, dt)
@@ -282,13 +257,13 @@ for k, index in enumerate(tqdm(range(n_sim))):
 
     # initialize states randomly
     history = {
-        'room': np.random.uniform(low=15, high=23),
-        'wall': np.random.uniform(low=10, high=18),
+        'room': np.random.uniform(low=15, high=23.5),
+        'wall': np.random.uniform(low=10, high=15),
         'room_noise': 0,
     }
     for ts in range(n_mpc):
         action = actions[ts]
-        actionsim = int(np.round(action))
+        actionsim = np.round(action)
         t_wall, t_room, power = get_simulation_step(history, out_temp[ts], actionsim, noise['room'][ts], noise['power'][ts])
         history['power'] = power
         history['power_noise'] = noise['power'][ts]

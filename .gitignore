@@ -5,6 +5,10 @@ __pycache__/
 
 /results
 /open_loop/results
+/open_loop/ma77_delay
+/open_loop/ma77_int
+/open_loop/ma77_real
+/open_loop/ma77_work
 
 # Jupyter Notebook
 .ipynb_checkpoints

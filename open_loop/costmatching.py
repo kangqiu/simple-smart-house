@@ -73,17 +73,18 @@ def get_mpc_state_trajectories(room0, wall0, tset, tout):
     power_trajectory = []
 
     for k in range(form.n_mpc - 1):
-        power = form.power_mpc(room, tset[k]).full().flatten()[0]
+        power = form.power_func(room, tset[k]).full().flatten()[0]
+        power = form.satpower_func(power)
         power_trajectory.append(power)
         # update state variables for prediction
-        wall_pred = form.wall_mpc(wall, room, tout[k]).full().flatten()[0]
-        room_pred = form.room_mpc(wall, room, tout[k], power).full().flatten()[0]
+        wall_pred = form.wall_func(wall, room, tout[k]).full().flatten()[0]
+        room_pred = form.room_func(wall, room, tout[k], power).full().flatten()[0]
         wall_trajectory.append(wall_pred)
         room_trajectory.append(room_pred)
 
         wall = wall_pred
         room = room_pred
-    power = form.power_mpc(room, tset[-1]).full().flatten()[0]
+    power = form.power_func(room, tset[-1]).full().flatten()[0]
     power_trajectory.append(power)
 
     return room_trajectory, wall_trajectory, power_trajectory
@@ -107,18 +108,19 @@ def get_Qmpc():
 
     Qmpc = 0
     for k in range(form.n_mpc-1):
-        power = form.power_mpc(room, tset[k+1])
-        l_mpc = form.lmpc_func(tmax[k], tmid[k], tmin[k], room, power, spot[k], form.thetal)
+        power = form.power_func(room, tset[k])
+        power = form.satpower_func(power)
+        l_mpc = form.lhat_func(tmax[k], tmid[k], tmin[k], room, power, spot[k], form.thetal)
         Qmpc += l_mpc
 
         # update state variables for prediction
-        wall_pred = form.wall_mpc(wall, room, tout[k])
-        room_pred = form.room_mpc(wall, room, tout[k], power)
+        wall_pred = form.wall_func(wall, room, tout[k])
+        room_pred = form.room_func(wall, room, tout[k], power)
 
         wall = wall_pred
         room = room_pred
 
-    t_mpc = form.tmpc_func(room[-1], tmax[-1], tmid[-1], tmin[-1], form.thetal)
+    t_mpc = form.that_func(room[-1], tmax[-1], tmid[-1], tmin[-1], form.thetal)
     Qmpc += t_mpc
     Qmpc_func = Function('Qmpc_func',
                          [room0, wall0, tset, tmax, tmid, tmin, tout, spot, form.thetal],
@@ -140,7 +142,7 @@ def get_Qbase():
 
     Qbase = 0
     for k in range(form.n_rl):
-        l_meas = form.lmeas_func(tmax[k], tmin[k], tmin[k], roommeas[k], powermeas[k], spot[k])
+        l_meas = form.lmeas_func(tmax[k], tmid[k], tmin[k], roommeas[k], powermeas[k], spot[k])
         Qbase += l_meas
 
     Qbase_func = Function('Qbase_func',
@@ -153,8 +155,7 @@ def get_Qbase():
 ###############################################################################################
 # decide which spot market to read
 time_start = datetime(2022, 9, 1, 0, 0).astimezone(form.local_timezone)
-spot_file = '../data/SpotData2022_Trheim.pkl'
-results_file = './results/derandomizev2_run1_test.pkl'
+results_file = './results/03_openloop_week.pkl'
 print(results_file)
 history_runs = read_results(results_file)
 
@@ -201,7 +202,7 @@ for k, index in enumerate(tqdm(range(len(history_runs)))):
 
 # #add regularization to slack variable tuning
 for t in range(len(thetal)):
-    J += 1e-2 * (w[t] - thetal[t])**2
+    J += 1e-1 * (w[t] - thetal[t])**2 / len(thetal)
 #
 
 # plot base cost and mpc cost predicted
@@ -243,7 +244,6 @@ print(w_opt)
 #get max residual
 k = residuals.index(max(residuals))
 plot_state_trajectories(k, history_runs)
-
 
 #get min residual
 k = residuals.index(min(residuals))

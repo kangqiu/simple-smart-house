@@ -16,22 +16,24 @@ import pandas as pd
 import numpy as np
 import pickle as pkl
 import matplotlib.pyplot as plt
-
+from dateutil.relativedelta import relativedelta
+import pytz
 ################################################################################################
 # file imports
-import config_sim as cfg
+# import config_sim as cfg
+import formulation as form
 
-def get_time():
+def get_time(start, stop):
     """
         creates list of timesteps based on user set start and stop time of simulation
         :return:
         """
-    timestep = cfg.start
+    timestep = start
     dt = []
 
     # get simulator timesteps
     timesteps = [timestep]
-    while timestep < (cfg.stop - timedelta(minutes=5)):
+    while timestep < (stop - timedelta(minutes=5)):
         timestep += timedelta(minutes=5)
         timesteps.append(timestep)
     for ts in timesteps:
@@ -40,10 +42,10 @@ def get_time():
 
     # get simulation + prediction horizon timesteps
 
-    timestep = cfg.start
+    timestep = start
     timesteps_N = [timestep]
     dt_N = []
-    while timestep < (cfg.stop + timedelta(hours=cfg.n_mpc) - timedelta(minutes=5)):
+    while timestep < (stop + timedelta(hours=form.n_mpc) - timedelta(minutes=5)):
         timestep += timedelta(minutes=5)
         timesteps_N.append(timestep)
 
@@ -77,13 +79,14 @@ def interpolate_spot_data(spot, start, dt):
     return spot
 
 def get_spot_data(start, stop, dt_N):
+    spot_file = './data/SpotData2022_Trheim.pkl'
     spot_data = pkl.load(
-            open(cfg.spot_file, 'rb')
+            open(spot_file, 'rb')
         )
     data = pd.DataFrame.from_dict(spot_data)
 
     data['Time_start'] = data['Time_start'].dt.tz_convert(
-        cfg.local_timezone
+        pytz.timezone('Europe/Oslo')
     )  # Local time zone
     mask = (data['Time_start'] >= start) & (data['Time_start'] <= stop)
 
@@ -101,77 +104,74 @@ def get_spot_data(start, stop, dt_N):
     return prices
 
 def get_outside_temperature(start, stop, dt_N):
-    # met_data = pkl.load(
-    #         open(os.path.join(cfg.temp_file), 'rb')
-    #     )
-    # seklima = pd.DataFrame.from_dict(met_data)
-    #
-    # # convert timezones
-    # seklima['Time'] = seklima['Time'].dt.tz_convert(cfg.local_timezone)
-    #
-    # # rename and drop columns
-    # # seklima = seklima.drop(
-    # #    columns=["Duggpunktstemperatur", "Relativ luftfuktighet"]
-    # # )
-    # seklima = seklima.rename(columns={"Lufttemperatur": "temperature"})
-    #
-    # mask = (seklima["Time"] >= start) & (seklima["Time"] <= stop)
-    #
-    # data = seklima.loc[mask]
-    #
-    # met_data = data.to_dict(orient="list")
-    #
-    # # Interpolate outside temperature for simulation
-    # met_time = []
-    # for ts in met_data["Time"]:
-    #     delta = ts - met_data["Time"][0]
-    #     met_time.append(delta.total_seconds() / 60)
-    # outtemp = list(
-    #     np.interp(dt_N, met_time, met_data["temperature"])
-    #     )
+    temp_file = './data/SEKLIMAData_2021.pkl'
+    start = start - relativedelta(years=1)
+    stop = stop - relativedelta(years=1)
+    met_data = pkl.load(
+            open(os.path.join(temp_file), 'rb')
+        )
+    seklima = pd.DataFrame.from_dict(met_data)
 
-    outtemp = [cfg.set_t_out] * len(dt_N)
+    # convert timezones
+    seklima['Time'] = seklima['Time'].dt.tz_convert(pytz.timezone('Europe/Oslo'))
+
+    # rename and drop columns
+    # seklima = seklima.drop(
+    #    columns=["Duggpunktstemperatur", "Relativ luftfuktighet"]
+    # )
+    seklima = seklima.rename(columns={"Lufttemperatur": "temperature"})
+
+    mask = (seklima["Time"] >= start) & (seklima["Time"] <= stop)
+
+    data = seklima.loc[mask]
+
+    met_data = data.to_dict(orient="list")
+
+    # Interpolate outside temperature for simulation
+    met_time = []
+    for ts in met_data["Time"]:
+        delta = ts - met_data["Time"][0]
+        met_time.append(delta.total_seconds() / 60)
+    outtemp = list(
+        np.interp(dt_N, met_time, met_data["temperature"])
+        )
+
+    # outtemp = [cfg.set_t_out] * len(dt_N)
 
     return outtemp
 
 
-def generate_noise_trajectories(timesteps):
+def generate_noise_trajectories(timesteps, noise_file):
 
     """ generates noise trajectory """
-    if cfg.add_noise:
-        # check if the noise file exists
-        if os.path.isfile(cfg.noise_file): # load noise file and check if the trajectories match
-            with open(cfg.noise_file, 'rb') as handle:
-                noise = pkl.load(handle)
-            if len(noise['room']) < len(timesteps):
-                raise Exception("Room temperature noise trajectory too short!")
-            if len(noise['power']) <len(timesteps):
-                raise Exception("Power  noise trajectory too short!")
 
-        else: # generates new noise file
-            power_noise = [0]
-            room_noise = [0]
-            for ts in range(len(timesteps)):
-                # power_noise.append(np.random.normal(0, 0.15))
-                power_noise.append(0.3* (cfg.noise['beta']['power'] * power_noise[-1] + np.random.normal(cfg.noise['mu']['power'], cfg.noise['epsilon']['power'] * cfg.noise['sig']['power'])))
-                room_noise.append(cfg.noise['beta']['room'] * room_noise[-1] + np.random.normal(cfg.noise['mu']['room'], cfg.noise['epsilon']['room'] * cfg.noise['sig']['room']))
-            plt.plot(range(len(room_noise)), room_noise)
-            plt.show()
-            plt.plot(range(len(power_noise)), power_noise)
-            plt.show()
-            #save noise in file 
-            noise = {'power': power_noise[1::], 'room': room_noise[1::]}
-            with open(cfg.noise_file, 'wb') as handle:
-                pkl.dump(noise, handle, protocol=-1)
+    # check if the noise file exists
+    if os.path.isfile(noise_file): # load noise file and check if the trajectories match
+        with open(noise_file, 'rb') as handle:
+            noise = pkl.load(handle)
+        if len(noise['room']) < len(timesteps):
+            raise Exception("Room temperature noise trajectory too short!")
+        if len(noise['power']) <len(timesteps):
+            raise Exception("Power  noise trajectory too short!")
 
-    else: #set noise to 0
+    else: # generates new noise file
         power_noise = [0]
         room_noise = [0]
         for ts in range(len(timesteps)):
-            power_noise.append(0)
-            room_noise.append(0)
-
+            # power_noise.append(np.random.normal(0, 0.15))
+            power_noise.append(0.3 *(form.noise['beta']['power'] * power_noise[-1]
+                                     + np.random.normal(form.noise['mu']['power'],
+                                                        form.noise['epsilon']['power'] * form.noise['sig']['power'])))
+            room_noise.append(form.noise['beta']['room'] * room_noise[-1]
+                              + np.random.normal(form.noise['mu']['room'], form.noise['epsilon']['room'] * form.noise['sig']['room']))
+        plt.plot(range(len(room_noise)), room_noise)
+        plt.show()
+        plt.plot(range(len(power_noise)), power_noise)
+        plt.show()
+        #save noise in file
         noise = {'power': power_noise[1::], 'room': room_noise[1::]}
+        with open(noise_file, 'wb') as handle:
+            pkl.dump(noise, handle, protocol=-1)
     
     return noise
 
